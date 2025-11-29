@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+requests
+numpy
+docling
+fastembed
+python-multipart
+httpx
+pydantic

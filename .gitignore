@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv312/
+venv/
+.env
+
+# Node / Frontend
+node_modules/
+frontend/node_modules/
+frontend/dist/
+.DS_Store
+
+# IDEs
+.vscode/
+.idea/
+
+# Project Specific
+server.log
+data/
+markdown_storage/
+temp_*
+knowledge_base.json
+settings.json
+deployment_options.md
