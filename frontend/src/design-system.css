@@ -437,6 +437,12 @@ label,
     border-bottom-color: var(--color-primary);
 }
 
+.tab:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
 /* ==========================================
    BADGES & PILLS
    ========================================== */

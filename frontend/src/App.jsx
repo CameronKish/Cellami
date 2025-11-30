@@ -72,6 +72,7 @@ const App = () => {
   const [documents, setDocuments] = useState([]);
   const [excludedDocs, setExcludedDocs] = useState([]); // Track deselected documents
   const [isOfficeInitialized, setIsOfficeInitialized] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false); // Global processing state
 
   // Viewer State
   const [viewerOpen, setViewerOpen] = useState(false);
@@ -181,7 +182,7 @@ const App = () => {
   const renderContent = () => {
     switch (activeTab) {
       case 'chat':
-        return <ChatView settings={settings} handleViewSource={handleViewSource} activeDocs={activeDocs} />;
+        return <ChatView settings={settings} handleViewSource={handleViewSource} activeDocs={activeDocs} onProcessingChange={setIsProcessing} />;
       case 'query':
         return <QueryView
           settings={settings}
@@ -193,6 +194,7 @@ const App = () => {
           debugPrompts={debugPrompts}
           setDebugPrompts={setDebugPrompts}
           activeDocs={activeDocs} // Pass active docs for RAG filtering
+          onProcessingChange={setIsProcessing}
         />;
       case 'docs':
         return <KnowledgeView
@@ -201,6 +203,7 @@ const App = () => {
           excludedDocs={excludedDocs}
           setExcludedDocs={setExcludedDocs}
           showInspectButton={showInspectButton}
+          onProcessingChange={setIsProcessing}
         />;
       case 'audit':
         return <AuditView onViewSource={handleViewSource} />;
@@ -218,9 +221,10 @@ const App = () => {
           setShowInspectButton={setShowInspectButton}
           developerMode={developerMode}
           setDeveloperMode={setDeveloperMode}
+          onProcessingChange={setIsProcessing}
         />;
       default:
-        return <ChatView settings={settings} handleViewSource={handleViewSource} />;
+        return <ChatView settings={settings} handleViewSource={handleViewSource} onProcessingChange={setIsProcessing} />;
     }
   };
 
@@ -234,16 +238,24 @@ const App = () => {
       <header style={{
         background: 'var(--color-bg-surface)',
         borderBottom: '1px solid var(--color-border-light)',
-        boxShadow: 'var(--shadow-sm)'
+        boxShadow: 'var(--shadow-sm)',
+        position: 'relative' // Needed for absolute positioning of progress bar if we wanted one, but here just for context
       }}>
-        <div style={{ width: '100%', padding: '0 16px' }}>
+        <div style={{
+          width: '100%',
+          padding: '0 16px',
+          borderTop: isProcessing ? '4px solid var(--color-primary)' : 'none',
+          transition: 'border-top 0.3s ease'
+        }}>
           <nav className="tabs" style={{ marginBottom: 0 }}>
             {['query', 'chat', 'docs', 'audit', 'settings'].map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
+                disabled={isProcessing}
                 className={`tab ${activeTab === tab ? 'active' : ''}`}
                 style={{ textTransform: 'capitalize' }}
+                title={isProcessing ? "Please wait for the current process to finish" : ""}
               >
                 {tab}
               </button>
@@ -281,7 +293,8 @@ const QueryView = ({
   setIncludeStyles,
   debugPrompts,
   setDebugPrompts,
-  activeDocs = [] // Default to empty array if not provided
+  activeDocs = [], // Default to empty array if not provided
+  onProcessingChange
 }) => {
   // Load persisted state from localStorage
   const loadPersistedState = () => {
@@ -342,6 +355,13 @@ const QueryView = ({
     }
     return () => clearInterval(interval);
   }, [loading]);
+
+  // Sync loading state with parent
+  useEffect(() => {
+    if (onProcessingChange) {
+      onProcessingChange(loading);
+    }
+  }, [loading, onProcessingChange]);
 
   // Save state to localStorage whenever it changes
   useEffect(() => {
@@ -1843,7 +1863,7 @@ const QueryView = ({
 
 
 
-const ChatView = ({ settings, handleViewSource, activeDocs = [] }) => {
+const ChatView = ({ settings, handleViewSource, activeDocs = [], onProcessingChange }) => {
   const [messages, setMessages] = useState(() => {
     // Load messages from localStorage on mount
     const saved = localStorage.getItem('chatMessages');
@@ -1870,6 +1890,13 @@ const ChatView = ({ settings, handleViewSource, activeDocs = [] }) => {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Sync loading state with parent
+  useEffect(() => {
+    if (onProcessingChange) {
+      onProcessingChange(loading);
+    }
+  }, [loading, onProcessingChange]);
 
   const handleClearChat = () => {
     setShowClearConfirm(true);
@@ -2458,9 +2485,20 @@ const ChatView = ({ settings, handleViewSource, activeDocs = [] }) => {
   );
 };
 
-const KnowledgeView = ({ documents, refreshDocs, excludedDocs = [], setExcludedDocs = () => { }, showInspectButton = false }) => {
+const KnowledgeView = ({ documents, refreshDocs, excludedDocs = [], setExcludedDocs = () => { }, showInspectButton = false, onProcessingChange }) => {
   const [activeUploads, setActiveUploads] = useState({});
   const [fileToDelete, setFileToDelete] = useState(null);
+
+  // Sync processing state with parent based on active uploads
+  useEffect(() => {
+    if (onProcessingChange) {
+      // Check if any upload is active (not completed, not error, not warning)
+      const isUploading = Object.values(activeUploads).some(
+        upload => !upload.completed && !upload.error && !upload.warning
+      );
+      onProcessingChange(isUploading);
+    }
+  }, [activeUploads, onProcessingChange]);
 
   const handleUpload = async (e) => {
     const files = Array.from(e.target.files);
@@ -3138,7 +3176,8 @@ const SettingsView = ({
   showInspectButton,
   setShowInspectButton,
   developerMode,
-  setDeveloperMode
+  setDeveloperMode,
+  onProcessingChange
 }) => {
   const [config, setConfig] = useState(settings?.config || {});
   const [saveStatus, setSaveStatus] = useState('idle');
@@ -3202,6 +3241,7 @@ const SettingsView = ({
     if (availableModels.length === 0) return;
 
     setIsBenchmarking(true);
+    if (onProcessingChange) onProcessingChange(true);
     setBenchmarkResults({});
 
     for (let i = 0; i < availableModels.length; i++) {
@@ -3228,6 +3268,7 @@ const SettingsView = ({
     }
 
     setIsBenchmarking(false);
+    if (onProcessingChange) onProcessingChange(false);
     setBenchmarkProgress('');
   };
 

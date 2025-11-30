@@ -17,10 +17,13 @@ frontend/dist/
 .idea/
 
 # Project Specific
-server.log
 data/
-markdown_storage/
 temp_*
-knowledge_base.json
-settings.json
-deployment_options.md
+
+# Build Artifacts
+build/
+dist/
+*.spec
+
+# Logs
+*.log

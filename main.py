@@ -8,6 +8,10 @@ import time
 import traceback
 import asyncio
 import httpx
+
+# Suppress huggingface/tokenizers warning about forking
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
 from fastapi import FastAPI, HTTPException, UploadFile, File, Body, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,22 +20,25 @@ from typing import List, Optional, Dict, Any, Generator
 import uuid
 import logging
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler()
-    ]
-)
-logger = logging.getLogger(__name__)
-
 # Global signals to abort active chat streams
 abort_signals = {}
 
+# Global Lock for Knowledge Base Access
+KB_LOCK = asyncio.Lock()
+
+# --- HELPER FUNCTIONS ---
 # --- CONFIGURATION ---
-SETTINGS_FILE = "settings.json"
-KB_FILE = "knowledge_base.json"
+# Centralize data storage to user's home directory
+# This ensures both the App Bundle and the Executable share the same data
+# and avoids "Read-only file system" errors in the App Bundle.
+USER_DATA_DIR = os.path.join(os.path.expanduser("~"), ".cellami")
+os.makedirs(USER_DATA_DIR, exist_ok=True)
+
+SETTINGS_FILE = os.path.join(USER_DATA_DIR, "settings.json")
+KB_FILE = os.path.join(USER_DATA_DIR, "knowledge_base.json")
+MD_STORAGE_DIR = os.path.join(USER_DATA_DIR, "markdown_storage")
+os.makedirs(MD_STORAGE_DIR, exist_ok=True)
+
 OLLAMA_BASE_URL = "http://localhost:11434/api"
 
 app = FastAPI()
@@ -48,6 +55,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Middleware to prevent caching of index.html
+@app.middleware("http")
+async def add_no_cache_header(request, call_next):
+    response = await call_next(request)
+    if request.url.path in ["/", "/index.html"]:
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
 
 # Store background tasks
 tasks: Dict[str, Dict[str, Any]] = {}
@@ -127,14 +144,13 @@ def get_next_chunk_id(kb_data: List[Dict]) -> int:
 
 # --- OLLAMA API WRAPPERS ---
 
-from fastembed import TextEmbedding
-
 # Global embedding model
 _embedding_model = None
 
 def get_embedding_model():
     global _embedding_model
     if _embedding_model is None:
+        from fastembed import TextEmbedding # Lazy import to speed up startup
         logger.info("Loading embedding model (nomic-ai/nomic-embed-text-v1.5)...")
         _embedding_model = TextEmbedding(model_name="nomic-ai/nomic-embed-text-v1.5")
         logger.info("Embedding model loaded.")
@@ -928,17 +944,22 @@ async def cancel_batch(task_id: str):
         
     return {"status": "cancelled"}
 
-from docling.document_converter import DocumentConverter
-
 def extract_text_from_file(file_path: str, filename: str) -> str:
     try:
         if filename.lower().endswith('.txt'):
             with open(file_path, "r", encoding="utf-8", errors="replace") as f:
                 return f.read()
 
-        converter = DocumentConverter()
-        result = converter.convert(file_path)
-        return result.document.export_to_markdown()
+        from docling.document_converter import DocumentConverter # Lazy import
+        
+        try:
+            converter = DocumentConverter()
+            result = converter.convert(file_path)
+            return result.document.export_to_markdown()
+        except Exception as e:
+            logger.error(f"Docling conversion failed: {e}")
+            logger.error(traceback.format_exc())
+            raise e
     except Exception as e:
         print(f"Error extracting text from {filename}: {e}")
         return ""
@@ -965,8 +986,8 @@ async def process_document_task(task_id: str, temp_path: str, filename: str):
         print(f"Task {task_id}: Saving markdown...")
         
         # Save full markdown for source viewer
-        os.makedirs("markdown_storage", exist_ok=True)
-        md_path = os.path.join("markdown_storage", f"{filename}.md")
+        # os.makedirs(MD_STORAGE_DIR, exist_ok=True) # Already created at startup
+        md_path = os.path.join(MD_STORAGE_DIR, f"{filename}.md")
         with open(md_path, "w") as f:
             f.write(content)
         
@@ -1027,8 +1048,19 @@ async def process_document_task(task_id: str, temp_path: str, filename: str):
                 failed_chunks += 1
                 failed_indices.append(i)
 
-        kb_data.extend(new_entries)
-        save_kb(kb_data)
+        # Critical Section: Atomic Update of Knowledge Base
+        # We re-load the KB here to get the latest state (in case other tasks finished while we were embedding)
+        async with KB_LOCK:
+            current_kb_data = load_kb()
+            # Recalculate IDs based on the *current* latest ID to avoid collisions
+            start_id = get_next_chunk_id(current_kb_data)
+            
+            # Update IDs of our new entries to match the current sequence
+            for i, entry in enumerate(new_entries):
+                entry["id"] = start_id + i
+                
+            current_kb_data.extend(new_entries)
+            save_kb(current_kb_data)
         
         tasks[task_id]["status"] = "completed"
         tasks[task_id]["progress"] = 100
@@ -1061,7 +1093,7 @@ async def process_document_task(task_id: str, temp_path: str, filename: str):
 
 @app.get("/api/document-content")
 def get_document_content(filename: str):
-    md_path = os.path.join("markdown_storage", f"{filename}.md")
+    md_path = os.path.join(MD_STORAGE_DIR, f"{filename}.md")
     if not os.path.exists(md_path):
         # Fallback: If file exists in KB but no markdown stored (old file), 
         # we could try to reconstruct or just return error.
@@ -1075,11 +1107,17 @@ def get_document_content(filename: str):
 
 @app.post("/api/add-document")
 async def add_document(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
+    # Sync KB before adding new files to ensure clean state
+    sync_knowledge_base()
+
     filename = file.filename
     task_id = str(uuid.uuid4())
     
-    # Save file temporarily
-    temp_path = f"temp_{task_id}_{filename}"
+    # Save file temporarily in system temp dir to avoid Read-only FS errors
+    import tempfile
+    temp_dir = tempfile.gettempdir()
+    temp_path = os.path.join(temp_dir, f"temp_{task_id}_{filename}")
+    
     with open(temp_path, "wb") as f:
         f.write(await file.read())
     
@@ -1103,6 +1141,46 @@ async def get_task_status(task_id: str):
         raise HTTPException(status_code=404, detail="Task not found")
     return tasks[task_id]
 
+def sync_knowledge_base():
+    """
+    Ensures that every document in the KB has a corresponding markdown file.
+    If the markdown file is missing, remove the document from the KB.
+    """
+    kb_data = load_kb()
+    if not kb_data:
+        return
+
+    # Identify unique sources in KB
+    unique_sources = set(item["source"] for item in kb_data)
+    
+    # 1. Clean Ghost Entries (KB entry exists, but file missing)
+    sources_to_remove = []
+    for source in unique_sources:
+        md_path = os.path.join(MD_STORAGE_DIR, f"{source}.md")
+        if not os.path.exists(md_path):
+            sources_to_remove.append(source)
+            
+    if sources_to_remove:
+        print(f"Syncing KB: Removing {len(sources_to_remove)} ghost documents from DB: {sources_to_remove}")
+        # Filter out chunks belonging to removed sources
+        kb_data = [item for item in kb_data if item["source"] not in sources_to_remove]
+        save_kb(kb_data)
+        # Update unique sources after cleanup
+        unique_sources = set(item["source"] for item in kb_data)
+
+    # 2. Clean Orphaned Files (File exists, but KB entry missing)
+    if os.path.exists(MD_STORAGE_DIR):
+        for filename in os.listdir(MD_STORAGE_DIR):
+            if filename.endswith(".md"):
+                source_name = filename[:-3] # Remove .md extension
+                if source_name not in unique_sources:
+                    file_path = os.path.join(MD_STORAGE_DIR, filename)
+                    try:
+                        os.remove(file_path)
+                        print(f"Syncing KB: Deleted orphaned file: {filename}")
+                    except Exception as e:
+                        print(f"Syncing KB: Failed to delete {filename}: {e}")
+
 @app.get("/api/list-documents")
 def list_documents():
     kb_data = load_kb()
@@ -1121,9 +1199,12 @@ def remove_document(filename: str = Body(..., embed=True)):
     save_kb(kb_data)
     
     # Also remove markdown file if exists
-    md_path = os.path.join("markdown_storage", f"{filename}.md")
+    md_path = os.path.join(MD_STORAGE_DIR, f"{filename}.md")
     if os.path.exists(md_path):
         os.remove(md_path)
+        
+    # Sync KB after removal to ensure consistency
+    sync_knowledge_base()
         
     return {"status": "success"}
 
@@ -1166,5 +1247,175 @@ def get_document_chunks(filename: str):
     
     return {"chunks": chunks}
 
+# --- STATIC FILES SERVING ---
+from fastapi.staticfiles import StaticFiles
+import sys
+
+def resource_path(relative_path):
+    """ Get absolute path to resource, works for dev and for PyInstaller """
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
+
+# Mount assets folder (for icons in manifest)
+assets_path = resource_path("assets")
+if os.path.exists(assets_path):
+    app.mount("/icons", StaticFiles(directory=assets_path), name="icons")
+else:
+    print(f"Warning: Assets folder not found at {assets_path}")
+
+# Mount frontend dist folder
+frontend_path = resource_path("frontend/dist")
+if os.path.exists(frontend_path):
+    app.mount("/", StaticFiles(directory=frontend_path, html=True), name="static")
+else:
+    print(f"Warning: Frontend dist folder not found at {frontend_path}. API mode only.")
+
+# Configure logging
+# Store logs in the centralized user data directory
+LOG_FILE = os.path.join(USER_DATA_DIR, "cellami.log")
+
+# Configure root logger for our app's messages
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler(LOG_FILE, mode='w')
+    ]
+)
+logger = logging.getLogger(__name__)
+
+# --- ENVIRONMENT FIX FOR MACOS APP ---
+# When running as a .app, PATH is restricted. We need to add common paths
+# so that libraries wrapping external tools (like tesseract/poppler) can find them.
+if sys.platform == "darwin":
+    common_paths = [
+        "/opt/homebrew/bin",
+        "/usr/local/bin",
+        "/usr/bin",
+        "/bin",
+        "/usr/sbin",
+        "/sbin"
+    ]
+    current_path = os.environ.get("PATH", "")
+    new_path = ":".join(common_paths) + ":" + current_path
+    os.environ["PATH"] = new_path
+    logger.info(f"Updated PATH for macOS App: {os.environ['PATH']}")
+# -------------------------------------
+
+# ... (rest of imports)
+
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    import multiprocessing
+    multiprocessing.freeze_support()
+    
+    import threading
+    import pystray
+    import subprocess
+    from PIL import Image
+    import copy
+    
+    # Configure Uvicorn logging to write to our file
+    # We copy the default config and add our file handler
+    log_config = copy.deepcopy(uvicorn.config.LOGGING_CONFIG)
+    log_config["handlers"]["file"] = {
+        "class": "logging.FileHandler",
+        "filename": LOG_FILE,
+        "mode": "w",
+        "formatter": "default",
+    }
+    # Add file handler to uvicorn loggers and disable propagation to avoid duplicates
+    for logger_name in ["uvicorn", "uvicorn.error", "uvicorn.access"]:
+        if logger_name in log_config["loggers"]:
+            if "handlers" in log_config["loggers"][logger_name]:
+                log_config["loggers"][logger_name]["handlers"].append("file")
+            else:
+                log_config["loggers"][logger_name]["handlers"] = ["file"]
+            
+            # Prevent double logging (once by uvicorn, once by root logger)
+            log_config["loggers"][logger_name]["propagate"] = False
+
+    # Define server configuration with custom log_config
+    config = uvicorn.Config(app, host="0.0.0.0", port=8000, log_level="info", log_config=log_config)
+    server = uvicorn.Server(config)
+    
+    def resource_path(relative_path):
+        """ Get absolute path to resource, works for dev and for PyInstaller """
+        try:
+            # PyInstaller creates a temp folder and stores path in _MEIPASS
+            base_path = sys._MEIPASS
+        except Exception:
+            base_path = os.path.abspath(".")
+
+        return os.path.join(base_path, relative_path)
+
+    def run_server():
+        server.run()
+        
+    def on_quit(icon, item):
+        icon.stop()
+        server.should_exit = True
+
+    def on_show_logs(icon, item):
+        """ Open a terminal window tailing the hidden log file """
+        if sys.platform == "darwin":
+            # macOS: Open in Console.app (native log viewer)
+            # This avoids AppleScript permission issues and provides a better UI
+            try:
+                subprocess.run(["open", "-a", "Console", LOG_FILE])
+            except Exception as e:
+                print(f"Failed to open logs in Console: {e}")
+                # Fallback to default handler
+                subprocess.run(["open", LOG_FILE])
+        elif sys.platform == "win32":
+            # Windows: Use 'start' to open a new CMD window and PowerShell to tail
+            # 'start' is a shell command, so shell=True is needed.
+            # We use PowerShell's Get-Content -Wait which is equivalent to tail -f
+            try:
+                subprocess.run(f'start powershell -NoExit -Command "Get-Content -Wait \'{LOG_FILE}\'"', shell=True)
+            except Exception as e:
+                print(f"Failed to open logs: {e}")
+        else:
+            # Linux/Other: Try generic x-terminal-emulator or similar (fallback)
+            try:
+                subprocess.Popen(["x-terminal-emulator", "-e", f"tail -f {LOG_FILE}"])
+            except Exception:
+                print("Platform not supported for automatic log viewing.")
+        
+    def setup_tray():
+        try:
+            # Use resource_path to find the icon
+            icon_path = resource_path(os.path.join("assets", "Cellami_Template.png"))
+            if not os.path.exists(icon_path):
+                print(f"Warning: Icon not found at {icon_path}. Tray icon might be blank.")
+                # Create a simple colored square as fallback
+                image = Image.new('RGB', (64, 64), color = (79, 70, 229)) # Indigo color
+            else:
+                image = Image.open(icon_path)
+                # Resize for better quality if it's huge
+                image.thumbnail((64, 64), Image.Resampling.LANCZOS)
+                
+            # Create menu with "Show Logs" and "Quit"
+            menu = pystray.Menu(
+                pystray.MenuItem("Show Logs", on_show_logs),
+                pystray.MenuItem("Quit Cellami", on_quit)
+            )
+            icon = pystray.Icon("Cellami", image, "Cellami", menu)
+            icon.run()
+        except Exception as e:
+            print(f"Failed to setup tray icon: {e}")
+            # Fallback to just running server if tray fails
+            if not server.started:
+                server.run()
+
+    # Start server in a separate thread
+    server_thread = threading.Thread(target=run_server)
+    server_thread.start()
+    
+    # Run tray icon in main thread (blocking)
+    setup_tray()

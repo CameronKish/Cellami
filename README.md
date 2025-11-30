@@ -1,93 +1,88 @@
+![Cellami Icon](assets/Cellami.png)
+
 # Cellami: Local AI for Excel
 
-**Cellami** is a powerful, privacy-first Excel Add-in that brings the power of Large Language Models (LLMs) directly into your spreadsheet. It runs entirely on your local machine using **Ollama**, ensuring your data never leaves your computer.
+**Cellami** is a private, local AI assistant that lives inside your Excel. It lets you chat with your data and documents without ever sending them to the cloud.
 
-![Cellami Icon](assets/Cellami.png)
+---
 
 ## 🚀 Features
 
-*   **Local & Private:** Powered by Ollama. No data is sent to the cloud.
-*   **Chat with Data:** Select cells and ask questions about them.
-*   **RAG (Retrieval Augmented Generation):** Build a Knowledge Base from your own documents (PDF, DOCX, TXT, etc.) and query them inside Excel.
-*   **Structured Table Analysis:** Analyze user-defined tables with context from your local Knowledge Base, enabling deep insights into your structured data.
+*   **🔒 Private & Local:** Runs on Ollama. Your data stays on your Mac.
+*   **💬 Chat with Data:** Select cells and ask questions.
+*   **📚 Knowledge Base:** Upload PDFs and Word docs to let the AI answer questions based on your files.
+*   **📊 Table Analysis:** Deep insights into your structured data.
 
-## 🛠️ Prerequisites
+---
 
-Before you begin, ensure you have the following installed:
+## 📦 Installation (For Users - Mac Only)
 
-1.  **[Ollama](https://ollama.com/)**: The engine for running local models.
-    *   After installing, run: `ollama pull mistral:7b` (or your preferred model).
-2.  **[Python 3.12+](https://www.python.org/)**: For the backend server.
-3.  **[Node.js](https://nodejs.org/)**: For the frontend build tools.
+### 1. Install the App
+1.  Download or copy the **`Cellami.app`** file to your computer (e.g., in your Applications folder).
+2.  Double-click **`Cellami.app`** to start it. (wait 10-15 seconds for it to appear)
+    *   **Note:** You won't see a window pop up! Look for the **Cellami icon** in your Mac's top menu bar (System Tray).
 
-## 📦 Installation
+### 2. Connect Excel
+1.  Open **Microsoft Excel**.
+2.  You need to "sideload" the add-in manifest once:
+    *   Go to this folder on your Mac:
+        `~/Library/Containers/com.microsoft.Excel/Data/Documents/wef` (if the "wef" folder doesn't exist, you will need to create it)
+        *(Press `Cmd+Shift+G` in Finder and paste that path)*.
+    *   Copy the `manifest.prod.xml` file into that folder.
+3.  Restart Excel.
+4.  Go to the **Insert** tab > and click the drop down arrow next to **My Add-ins**. 
+5.  Select **Cellami** from the Developer add-ins section.
 
-### 1. Clone the Repository
-```bash
-git clone https://github.com/cameronkish/cellami.git
-cd cellami
-```
+---
 
-### 2. Backend Setup (Python)
-It is recommended to use a virtual environment.
+## 💻 Development (For Contributors)
 
-```bash
-# Create virtual environment
-python -m venv venv
+### Prerequisites
+*   **Node.js** (for Frontend)
+*   **Python 3.12+** (for Backend)
 
-# Activate it
-# Windows:
-venv\Scripts\activate
-# Mac/Linux:
-source venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
-```
-
-### 3. Frontend Setup (Node.js)
-```bash
-cd frontend
-npm install
-cd ..
-```
-
-## 🏃‍♂️ Running the App (Development)
-
-To run the app in development mode (with hot-reloading):
-
-1.  **Start the Backend:**
+### Setup
+1.  **Frontend:**
     ```bash
-    # In the root directory
-    uvicorn main:app --reload --port 8000
+    cd frontend
+    npm install
+    ```
+2.  **Backend:**
+    ```bash
+    pip install -r requirements.txt
     ```
 
-2.  **Start the Frontend:**
+### Running Locally
+1.  **Start Frontend:**
     ```bash
-    # In a new terminal, inside frontend/
     cd frontend
     npm run dev
     ```
+2.  **Start Backend:**
+    ```bash
+    python main.py
+    ```
 
-3.  **Sideload into Excel:**
-    *   **Mac:** Copy `manifest.xml` to `~/Library/Containers/com.microsoft.Excel/Data/Documents/wef`.
-    *   **Windows:** Add the folder containing `manifest.xml` to **Excel > Options > Trust Center > Trusted Add-in Catalogs**.
-    *   Restart Excel and look for the **Cellami** tab.
+---
 
-## 🚢 Deployment (Bundled App)
+## 🏗️ Building (Distribution)
 
-For end-users, you can package Cellami into a single executable file (`.exe` or `.app`) so they don't need to install Python or Node.js.
+To create the standalone application:
 
-See **[deployment_options.md](deployment_options.md)** for the full guide on how to build and distribute the bundled app.
+### 🍎 macOS
+**Note:** This is already prebuilt for Mac users within the "Releases" section of this repository.
 
-## 🧠 Knowledge Base
+Run the build script:
+```bash
+./build_app.sh
+```
+This will create `dist/Cellami.app`.
 
-Cellami supports RAG (Retrieval Augmented Generation).
-1.  Go to the **Docs** tab in the add-in.
-2.  Upload your documents (PDF, Markdown, Text).
-3.  Cellami will chunk and embed them locally.
-4.  In the **Query** or **Chat** tab, enable "Use RAG" to let the AI answer questions based on your documents.
+### 🪟 Windows
+**Note:** You must run this on a Windows machine to create a Windows executable.
 
-## 📄 License
-
-[MIT License](LICENSE)
+Run the batch script:
+```cmd
+build_app.bat
+```
+This will create `dist/Cellami.exe`.

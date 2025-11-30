@@ -7,3 +7,5 @@ fastembed
 python-multipart
 httpx
 pydantic
+pystray
+Pillow
