@@ -80,4 +80,6 @@ if [ -f "$INFO_PLIST" ]; then
 fi
 
 echo "✅ Build Complete!"
+cp manifest.prod.xml dist/
+echo "📄 Copied manifest.prod.xml to dist/"
 echo "🎉 Your app is ready at: dist/Cellami.app"

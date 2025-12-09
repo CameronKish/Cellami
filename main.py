@@ -718,7 +718,8 @@ async def run_batch_job(task_id: str, request: BatchRequest):
                     # Legacy fallback
                     query_text = request.search_query
 
-                rag_result = find_relevant_context(query_text, doc_filters=request.doc_filters)
+                # Run RAG search in a separate thread to avoid blocking the event loop
+                rag_result = await asyncio.to_thread(find_relevant_context, query_text, doc_filters=request.doc_filters)
                 context = rag_result["context"]
                 sources = rag_result.get("sources", [])
                 

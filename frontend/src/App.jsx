@@ -561,7 +561,22 @@ const QueryView = ({
         const rowData = [];
         for (let col = 0; col < r.columnCount; col++) {
           const cell = cellData[row][col];
-          let value = cell.text; // Use formatted text instead of raw value
+          // Ensure value is a string (handle cases where Excel returns an object)
+          let value = String(cell.text);
+
+          // Fix for narrow columns displaying "#####"
+          // Check if the text is composed entirely of hashes and whitespace
+          const isAllHashes = value &&
+            value.includes('#') &&
+            value.replace(/[#\s]/g, '').length === 0;
+
+          if (isAllHashes) {
+            // Fallback to raw value
+            if (r.values && r.values[row] && r.values[row][col] !== undefined) {
+              const rawValue = r.values[row][col];
+              value = String(rawValue);
+            }
+          }
 
           // Apply markdown for bold/italic
           if (options.includeStyles) {
@@ -651,15 +666,33 @@ const QueryView = ({
     if (finalRows.length === 0) return "";
 
     // Build markdown table
-    let markdown = "LEGEND: **text** = bold, *text* = italic, [bg:#RGB] = background color, [fg:#RGB] = font color. Refer to colors by name (e.g. 'red'), never hex codes.\n\n";
+    let legendParts = [];
+    if (options.includeStyles) {
+      legendParts.push("**text** = bold, *text* = italic");
+    }
+    if (options.includeColors) {
+      legendParts.push("[bg:#RGB] = background color, [fg:#RGB] = font color. Refer to colors by name (e.g. 'red'), never hex codes");
+    }
 
-    // Header row (always the first row of our processed set)
-    markdown += "| " + finalRows[0].join(" | ") + " |\n";
-    markdown += "|" + finalRows[0].map(() => "---").join("|") + "|\n";
+    let markdown = "";
+    if (legendParts.length > 0) {
+      markdown += "LEGEND: " + legendParts.join(", ") + ".\n\n";
+    }
 
-    // Data rows
-    for (let i = 1; i < finalRows.length; i++) {
-      markdown += "| " + finalRows[i].join(" | ") + " |\n";
+    if (hasExplicitHeader) {
+      // Header row (always the first row of our processed set)
+      markdown += "| " + finalRows[0].join(" | ") + " |\n";
+      markdown += "|" + finalRows[0].map(() => "---").join("|") + "|\n";
+
+      // Data rows
+      for (let i = 1; i < finalRows.length; i++) {
+        markdown += "| " + finalRows[i].join(" | ") + " |\n";
+      }
+    } else {
+      // No explicit header: treat all rows as data, no separator line
+      for (let i = 0; i < finalRows.length; i++) {
+        markdown += "| " + finalRows[i].join(" | ") + " |\n";
+      }
     }
 
     return markdown;
@@ -3378,19 +3411,32 @@ const SettingsView = ({
                     <p style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-medium)', marginBottom: 'var(--space-xs)', color: 'var(--color-text-primary)' }}>
                       ⚡ <strong>gemma3:4b</strong> - Lightweight & efficient
                     </p>
-                    <p className="text-secondary" style={{ fontSize: 'var(--font-size-sm)', marginLeft: 'var(--space-xl)' }}>
+                    <p className="text-secondary" style={{ fontSize: 'var(--font-size-sm)', marginLeft: 'var(--space-xl)', marginBottom: 'var(--space-xs)' }}>
                       Perfect for systems with limited memory (8GB or less).
+                    </p>
+                    <p className="text-secondary" style={{ fontSize: 'var(--font-size-xs)', marginLeft: 'var(--space-xl)', color: 'var(--color-text-tertiary)' }}>
+                      <em>Examples: "Categorized these expenses as Travel, Food, or Utilities", "Extract email and sentiment from each customer review"</em><br />
+                      <span style={{ color: 'var(--color-success)' }}>✅ Fast text processing</span><br />
+                      <span style={{ color: 'var(--color-error)' }}>⚠️ Unreliable for math or numerical accuracy</span>
+                    </p>
+                    <p className="text-secondary" style={{ fontSize: 'var(--font-size-xs)', marginLeft: 'var(--space-xl)', fontStyle: 'italic', color: 'var(--color-text-tertiary)', marginTop: 'var(--space-xs)' }}>
+                      Alternatives to try: <strong>ministral-3:3b</strong>
                     </p>
                   </div>
 
                   <div style={{ marginBottom: 'var(--space-md)' }}>
                     <p style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-medium)', marginBottom: 'var(--space-xs)', color: 'var(--color-text-primary)' }}>
-                      🌟 <strong>mistral:7b</strong> - Best all-around choice
+                      🌟 <strong>ministral-3:8b</strong> - Best all-around choice
                     </p>
                     <p className="text-secondary" style={{ fontSize: 'var(--font-size-sm)', marginLeft: 'var(--space-xl)', marginBottom: 'var(--space-xs)' }}>
                       Great balance of speed and quality. Works well on most systems.
                     </p>
-                    <p className="text-secondary" style={{ fontSize: 'var(--font-size-xs)', marginLeft: 'var(--space-xl)', fontStyle: 'italic', color: 'var(--color-text-tertiary)' }}>
+                    <p className="text-secondary" style={{ fontSize: 'var(--font-size-xs)', marginLeft: 'var(--space-xl)', color: 'var(--color-text-tertiary)' }}>
+                      <em>Examples: "Complete this RFP based on the Knowledge Base", "Generally summarize trends from each line of this table"</em><br />
+                      <span style={{ color: 'var(--color-success)' }}>✅ General reasoning capabilities</span><br />
+                      <span style={{ color: 'var(--color-error)' }}>⚠️ Limited math accuracy, moderate speed</span>
+                    </p>
+                    <p className="text-secondary" style={{ fontSize: 'var(--font-size-xs)', marginLeft: 'var(--space-xl)', fontStyle: 'italic', color: 'var(--color-text-tertiary)', marginTop: 'var(--space-xs)' }}>
                       Alternatives to try: <strong>gemma3:12b</strong>
                     </p>
                   </div>
@@ -3399,8 +3445,13 @@ const SettingsView = ({
                     <p style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-medium)', marginBottom: 'var(--space-xs)', color: 'var(--color-text-primary)' }}>
                       🚀 <strong>gpt-oss:20b</strong> - Premium quality
                     </p>
-                    <p className="text-secondary" style={{ fontSize: 'var(--font-size-sm)', marginLeft: 'var(--space-xl)' }}>
+                    <p className="text-secondary" style={{ fontSize: 'var(--font-size-sm)', marginLeft: 'var(--space-xl)', marginBottom: 'var(--space-xs)' }}>
                       Highest quality responses. Requires 32GB+ memory for optimal performance. Optimized for Apple Silicon.
+                    </p>
+                    <p className="text-secondary" style={{ fontSize: 'var(--font-size-xs)', marginLeft: 'var(--space-xl)', color: 'var(--color-text-tertiary)' }}>
+                      <em>Examples: "What is driving financial trends based on the 10-k?", "Using a threshold of $5,500, flag journal entries that require attention."</em><br />
+                      <span style={{ color: 'var(--color-success)' }}>✅ Capable of math and detailed analysis</span><br />
+                      <span style={{ color: 'var(--color-error)' }}>⚠️ Slow if limited memory</span>
                     </p>
                   </div>
                 </div>
@@ -3444,7 +3495,7 @@ const SettingsView = ({
                 marginTop: 'var(--space-lg)'
               }}>
                 <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-primary)', margin: 0, lineHeight: 1.5 }}>
-                  <strong>💡 Tip:</strong> Not sure which model to choose? Start with <strong>mistral:7b</strong> - it's a great all-around model that works well on most computers.
+                  <strong>💡 Tip:</strong> Not sure which model to choose? Start with <strong>ministral-3:8b</strong>, it's a great all-around model that works well on most computers.
                 </p>
               </div>
             </div>
