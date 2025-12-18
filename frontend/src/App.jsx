@@ -3232,6 +3232,13 @@ const SettingsView = ({
   const [benchmarkProgress, setBenchmarkProgress] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showGettingStarted, setShowGettingStarted] = useState(false);
+  const [showRecommendedModels, setShowRecommendedModels] = useState(false);
+
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text).then(() => {
+      // Could add a toast here, but for now simple feedback
+    });
+  };
 
   useEffect(() => {
     if (settings?.config) setConfig(settings.config);
@@ -3359,18 +3366,10 @@ const SettingsView = ({
                   Download & Install Ollama
                 </h4>
                 <p className="text-secondary" style={{ fontSize: 'var(--font-size-base)', marginBottom: 'var(--space-sm)', lineHeight: 1.6 }}>
-                  Visit <a href="https://ollama.com" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-primary)', textDecoration: 'underline' }}>ollama.com</a> and download the installer for your system:
+                  Visit <a href="https://ollama.com" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-primary)', textDecoration: 'underline' }}>ollama.com</a> and download the installer for your system.
                 </p>
-                <ul style={{ marginLeft: 'var(--space-xl)', marginBottom: 'var(--space-sm)' }}>
-                  <li className="text-secondary" style={{ fontSize: 'var(--font-size-base)', marginBottom: 'var(--space-xs)' }}>
-                    <strong>Windows:</strong> Download and run the .exe installer
-                  </li>
-                  <li className="text-secondary" style={{ fontSize: 'var(--font-size-base)' }}>
-                    <strong>Mac:</strong> Download and open the .dmg file, then drag Ollama to Applications
-                  </li>
-                </ul>
                 <p className="text-secondary" style={{ fontSize: 'var(--font-size-sm)', fontStyle: 'italic', color: 'var(--color-text-tertiary)' }}>
-                  Once installed, Ollama will run in the background automatically.
+                  Once installed, Ollama should run in the background automatically (as indicated by Ollama icon in your system tray/menu bar).
                 </p>
               </div>
 
@@ -3393,7 +3392,7 @@ const SettingsView = ({
                   Download a Model
                 </h4>
                 <p className="text-secondary" style={{ fontSize: 'var(--font-size-base)', marginBottom: 'var(--space-sm)', lineHeight: 1.6 }}>
-                  Open the Ollama app (it should be in your system tray/menu bar). Click on it and select "Browse Models" or visit <a href="https://ollama.com/library" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-primary)', textDecoration: 'underline' }}>ollama.com/library</a>.
+                  Open the Ollama app (ensure it resides in your system tray/menu bar), <strong>open your computer's Terminal</strong> and paste one of the recommended model commands below and press enter.
                 </p>
 
                 <div style={{
@@ -3403,61 +3402,108 @@ const SettingsView = ({
                   padding: 'var(--space-lg)',
                   marginBottom: 'var(--space-md)'
                 }}>
-                  <h5 style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--space-sm)', color: 'var(--color-text-primary)' }}>
-                    Recommended Models:
+                  <h5
+                    style={{
+                      fontSize: 'var(--font-size-base)',
+                      fontWeight: 'var(--font-weight-semibold)',
+                      marginBottom: 'var(--space-sm)',
+                      color: 'var(--color-text-primary)',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 'var(--space-xs)'
+                    }}
+                    onClick={() => setShowRecommendedModels(!showRecommendedModels)}
+                  >
+                    <span>{showRecommendedModels ? '▼' : '▶'}</span> Recommended Models
                   </h5>
 
-                  <div style={{ marginBottom: 'var(--space-md)' }}>
-                    <p style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-medium)', marginBottom: 'var(--space-xs)', color: 'var(--color-text-primary)' }}>
-                      ⚡ <strong>gemma3:4b</strong> - Lightweight & efficient
-                    </p>
-                    <p className="text-secondary" style={{ fontSize: 'var(--font-size-sm)', marginLeft: 'var(--space-xl)', marginBottom: 'var(--space-xs)' }}>
-                      Perfect for systems with limited memory (8GB or less).
-                    </p>
-                    <p className="text-secondary" style={{ fontSize: 'var(--font-size-xs)', marginLeft: 'var(--space-xl)', color: 'var(--color-text-tertiary)' }}>
-                      <em>Examples: "Categorized these expenses as Travel, Food, or Utilities", "Extract email and sentiment from each customer review"</em><br />
-                      <span style={{ color: 'var(--color-success)' }}>✅ Fast text processing</span><br />
-                      <span style={{ color: 'var(--color-error)' }}>⚠️ Unreliable for math or numerical accuracy</span>
-                    </p>
-                    <p className="text-secondary" style={{ fontSize: 'var(--font-size-xs)', marginLeft: 'var(--space-xl)', fontStyle: 'italic', color: 'var(--color-text-tertiary)', marginTop: 'var(--space-xs)' }}>
-                      Alternatives to try: <strong>ministral-3:3b</strong>
-                    </p>
-                  </div>
+                  {showRecommendedModels && (
+                    <>
+                      <div style={{ marginBottom: 'var(--space-md)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)', marginBottom: 'var(--space-xs)' }}>
+                          <p style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-medium)', margin: 0, color: 'var(--color-text-primary)' }}>
+                            ⚡ <strong>gemma3:4b</strong>
+                          </p>
+                          <button
+                            className='btn btn-secondary btn-sm'
+                            style={{ padding: '2px 8px', fontSize: '10px' }}
+                            onClick={() => copyToClipboard('ollama pull gemma3:4b')}
+                            title="Copy install command"
+                          >
+                            Copy Install Command
+                          </button>
+                        </div>
 
-                  <div style={{ marginBottom: 'var(--space-md)' }}>
-                    <p style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-medium)', marginBottom: 'var(--space-xs)', color: 'var(--color-text-primary)' }}>
-                      🌟 <strong>ministral-3:8b</strong> - Best all-around choice
-                    </p>
-                    <p className="text-secondary" style={{ fontSize: 'var(--font-size-sm)', marginLeft: 'var(--space-xl)', marginBottom: 'var(--space-xs)' }}>
-                      Great balance of speed and quality. Works well on most systems.
-                    </p>
-                    <p className="text-secondary" style={{ fontSize: 'var(--font-size-xs)', marginLeft: 'var(--space-xl)', color: 'var(--color-text-tertiary)' }}>
-                      <em>Examples: "Complete this RFP based on the Knowledge Base", "Generally summarize trends from each line of this table"</em><br />
-                      <span style={{ color: 'var(--color-success)' }}>✅ General reasoning capabilities</span><br />
-                      <span style={{ color: 'var(--color-error)' }}>⚠️ Limited math accuracy, moderate speed</span>
-                    </p>
-                    <p className="text-secondary" style={{ fontSize: 'var(--font-size-xs)', marginLeft: 'var(--space-xl)', fontStyle: 'italic', color: 'var(--color-text-tertiary)', marginTop: 'var(--space-xs)' }}>
-                      Alternatives to try: <strong>gemma3:12b</strong>
-                    </p>
-                  </div>
+                        <p className="text-secondary" style={{ fontSize: 'var(--font-size-sm)', marginLeft: 'var(--space-xl)', marginBottom: 'var(--space-xs)' }}>
+                          Perfect for systems with limited memory (8GB or less).
+                        </p>
+                        <p className="text-secondary" style={{ fontSize: 'var(--font-size-xs)', marginLeft: 'var(--space-xl)', color: 'var(--color-text-tertiary)' }}>
+                          <em>Examples: "Categorized these expenses as Travel, Food, or Utilities", "Extract email and sentiment from each customer review"</em><br />
+                          <span style={{ color: 'var(--color-success)' }}>✅ Fast text processing</span><br />
+                          <span style={{ color: 'var(--color-error)' }}>⚠️ Unreliable for math or numerical accuracy</span>
+                        </p>
+                        <p className="text-secondary" style={{ fontSize: 'var(--font-size-xs)', marginLeft: 'var(--space-xl)', fontStyle: 'italic', color: 'var(--color-text-tertiary)', marginTop: 'var(--space-xs)' }}>
+                          Alternatives to try: <strong>ministral-3:3b</strong>
+                        </p>
+                      </div>
 
-                  <div>
-                    <p style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-medium)', marginBottom: 'var(--space-xs)', color: 'var(--color-text-primary)' }}>
-                      🚀 <strong>gpt-oss:20b</strong> - Premium quality
-                    </p>
-                    <p className="text-secondary" style={{ fontSize: 'var(--font-size-sm)', marginLeft: 'var(--space-xl)', marginBottom: 'var(--space-xs)' }}>
-                      Highest quality responses. Requires 32GB+ memory for optimal performance. Optimized for Apple Silicon.
-                    </p>
-                    <p className="text-secondary" style={{ fontSize: 'var(--font-size-xs)', marginLeft: 'var(--space-xl)', color: 'var(--color-text-tertiary)' }}>
-                      <em>Examples: "What is driving financial trends based on the 10-k?", "Using a threshold of $5,500, flag journal entries that require attention."</em><br />
-                      <span style={{ color: 'var(--color-success)' }}>✅ Capable of math and detailed analysis</span><br />
-                      <span style={{ color: 'var(--color-error)' }}>⚠️ Slow if limited memory</span>
-                    </p>
-                  </div>
+                      <div style={{ marginBottom: 'var(--space-md)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)', marginBottom: 'var(--space-xs)' }}>
+                          <p style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-medium)', margin: 0, color: 'var(--color-text-primary)' }}>
+                            🌟 <strong>ministral-3:8b</strong>
+                          </p>
+                          <button
+                            className='btn btn-secondary btn-sm'
+                            style={{ padding: '2px 8px', fontSize: '10px' }}
+                            onClick={() => copyToClipboard('ollama pull ministral-3:8b')}
+                            title="Copy install command"
+                          >
+                            Copy Install Command
+                          </button>
+                        </div>
+                        <p className="text-secondary" style={{ fontSize: 'var(--font-size-sm)', marginLeft: 'var(--space-xl)', marginBottom: 'var(--space-xs)' }}>
+                          Great balance of speed and quality. Works well on most systems.
+                        </p>
+                        <p className="text-secondary" style={{ fontSize: 'var(--font-size-xs)', marginLeft: 'var(--space-xl)', color: 'var(--color-text-tertiary)' }}>
+                          <em>Examples: "Complete this RFP based on the Knowledge Base", "Generally summarize trends from each line of this table"</em><br />
+                          <span style={{ color: 'var(--color-success)' }}>✅ General reasoning capabilities</span><br />
+                          <span style={{ color: 'var(--color-error)' }}>⚠️ Limited math accuracy, moderate speed</span>
+                        </p>
+                        <p className="text-secondary" style={{ fontSize: 'var(--font-size-xs)', marginLeft: 'var(--space-xl)', fontStyle: 'italic', color: 'var(--color-text-tertiary)', marginTop: 'var(--space-xs)' }}>
+                          Alternatives to try: <strong>gemma3:12b</strong>
+                        </p>
+                      </div>
+
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)', marginBottom: 'var(--space-xs)' }}>
+                          <p style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-medium)', margin: 0, color: 'var(--color-text-primary)' }}>
+                            🚀 <strong>gpt-oss:20b</strong>
+                          </p>
+                          <button
+                            className='btn btn-secondary btn-sm'
+                            style={{ padding: '2px 8px', fontSize: '10px' }}
+                            onClick={() => copyToClipboard('ollama pull gpt-oss:20b')}
+                            title="Copy install command"
+                          >
+                            Copy Install Command
+                          </button>
+                        </div>
+                        <p className="text-secondary" style={{ fontSize: 'var(--font-size-sm)', marginLeft: 'var(--space-xl)', marginBottom: 'var(--space-xs)' }}>
+                          Highest quality responses. Requires 32GB+ memory for optimal performance. Optimized for Apple Silicon.
+                        </p>
+                        <p className="text-secondary" style={{ fontSize: 'var(--font-size-xs)', marginLeft: 'var(--space-xl)', color: 'var(--color-text-tertiary)' }}>
+                          <em>Examples: "What is driving financial trends based on the 10-k?", "Using a threshold of $5,500, flag journal entries that require attention."</em><br />
+                          <span style={{ color: 'var(--color-success)' }}>✅ Capable of math and detailed analysis</span><br />
+                          <span style={{ color: 'var(--color-error)' }}>⚠️ Slow if limited memory</span>
+                        </p>
+                      </div>
+                    </>
+                  )}
                 </div>
 
-                <p className="text-secondary" style={{ fontSize: 'var(--font-size-base)', lineHeight: 1.6 }}>
-                  In the Ollama app, search for your chosen model and click "Pull" or "Download". The model will download and install automatically.
+                <p className="text-secondary" style={{ fontSize: 'var(--font-size-sm)', marginTop: 'var(--space-md)', color: 'var(--color-text-secondary)' }}>
+                  Alternatively, you can download models directly through the Ollama app interface or visit the <a href="https://ollama.com/library" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-primary)', textDecoration: 'underline' }}>Ollama Library</a> to see all available models.
                 </p>
               </div>
 
