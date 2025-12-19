@@ -7,7 +7,7 @@
   xsi:type="TaskPaneApp">
 
   <Id>c3940250-37f3-444c-8032-39ed3e997b28</Id>
-  <Version>1.0.0.0</Version>
+  <Version>1.1.0.0</Version>
   <ProviderName>Cellami</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="Cellami" />
