@@ -19,6 +19,25 @@ from pydantic import BaseModel
 from typing import List, Optional, Dict, Any, Generator
 import uuid
 import logging
+import secrets
+from fastapi import Request, Response
+
+# Configure logging early so it's available for auth
+# Store logs in the centralized user data directory
+USER_DATA_DIR = os.path.join(os.path.expanduser("~"), ".cellami")
+os.makedirs(USER_DATA_DIR, exist_ok=True)
+LOG_FILE = os.path.join(USER_DATA_DIR, "cellami.log")
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler(LOG_FILE, mode='w')
+    ]
+)
+logger = logging.getLogger(__name__)
+
 
 # Global signals to abort active chat streams
 abort_signals = {}
@@ -43,14 +62,43 @@ OLLAMA_BASE_URL = "http://localhost:11434/api"
 
 app = FastAPI()
 
-@app.get("/")
-def read_root():
-    return {"status": "Cellami Backend is Running", "docs_url": "/docs"}
+
+
+# --- AUTHENTICATION ---
+# (Moved to top of file after logger init)
+
+
+
+
+@app.middleware("http")
+async def auth_middleware(request: Request, call_next):
+    # Allow public endpoints and non-api routes (like static files)
+    # Also alow OPTIONS requests for CORS preflight
+    if request.method == "OPTIONS":
+        return await call_next(request)
+        
+    if request.url.path in ["/", "/docs", "/openapi.json", "/api/auth/token"] or not request.url.path.startswith("/api"):
+        return await call_next(request)
+    
+    # Check Token
+    token = request.headers.get("X-API-Token")
+    if token != SESSION_TOKEN:
+         logger.warning(f"Unauthorized access attempt to {request.url.path}")
+         return Response(content="Unauthorized", status_code=401)
+         
+    return await call_next(request)
+
 
 # Enable CORS for Office Add-in
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, restrict this to the add-in's origin
+    allow_origins=[
+        "http://localhost:5173",  # Vite Dev Server
+        "http://localhost:4173",  # Vite Preview
+        "http://localhost:3000",  # Common React/Add-in port
+        "https://localhost:3000", # Common HTTPS port
+        "https://localhost:5173", # Vite HTTPS
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -364,6 +412,13 @@ def find_relevant_context(query: str, top_k: int = 3, doc_filters: List[str] = N
     
     return {"context": context_str, "tag": tag_str, "sources": top_results}
 
+
+def sanitize_filename(filename: str) -> str:
+    # Keep only alphanumeric, dots, dashes, underscores
+    name = re.sub(r'[^a-zA-Z0-9_.-]', '_', filename)
+    # Prevent directory traversal or empty names
+    return name.strip("._") or "unnamed_file"
+
 def clean_text(text: str) -> str:
     # Remove non-printable characters but keep newlines/tabs
     text = "".join(ch for ch in text if ch.isprintable() or ch in "\n\t\r")
@@ -379,7 +434,7 @@ def get_settings():
 @app.get("/api/list-models")
 def list_models():
     try:
-        response = requests.get(f"{OLLAMA_BASE_URL}/tags")
+        response = requests.get(f"{OLLAMA_BASE_URL}/tags", timeout=5)
         if response.status_code == 200:
             data = response.json()
             models = [model["name"] for model in data.get("models", [])]
@@ -527,7 +582,7 @@ async def chat(request: ChatRequest):
                 # We use the sync function here as per existing patterns, though async would be better long-term
                 generated_query = await get_ollama_generate(query_gen_prompt, model, temperature=0.3)
                 generated_query = generated_query.strip().strip('"').strip("'")
-                logger.info(f"RAG Query Expansion: '{last_user_msg['content'][:50]}...' -> '{generated_query}'")
+                logger.info(f"RAG Query Expansion: (length: {len(last_user_msg['content'])}) -> '{generated_query}'")
                 
                 # 3. Execute Search with Generated Query
                 rag_result = find_relevant_context(generated_query, doc_filters=request.filtered_documents)
@@ -693,7 +748,7 @@ async def run_batch_job(task_id: str, request: BatchRequest):
                 # Default: Append cell text to prompt for context-aware search
                 truncated_text = text[:500] if text else ""
                 query_text = f"{request.prompt} {truncated_text}"
-                logger.info(f"Batch RAG Query [{i}] (Default): {query_text}")
+                logger.info(f"Batch RAG Query [{i}] (Default): [Redacted Length: {len(query_text)}]")
                 
                 if request.refinement_strategy == "none":
                     # Already set above
@@ -1111,7 +1166,7 @@ async def add_document(background_tasks: BackgroundTasks, file: UploadFile = Fil
     # Sync KB before adding new files to ensure clean state
     sync_knowledge_base()
 
-    filename = file.filename
+    filename = sanitize_filename(file.filename)
     task_id = str(uuid.uuid4())
     
     # Save file temporarily in system temp dir to avoid Read-only FS errors
@@ -1255,10 +1310,16 @@ import sys
 def resource_path(relative_path):
     """ Get absolute path to resource, works for dev and for PyInstaller """
     try:
-        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        # PyInstaller creates a temp folder and stores path in _MEIPASS (Onefile)
         base_path = sys._MEIPASS
     except Exception:
-        base_path = os.path.abspath(".")
+        # If _MEIPASS is not defined, we might be in finding mode (Onedir) or Dev
+        if getattr(sys, 'frozen', False):
+            # Onedir: The application is frozen, resources are next to the executable
+            base_path = os.path.dirname(sys.executable)
+        else:
+            # Dev: Standard local path
+            base_path = os.path.abspath(".")
 
     return os.path.join(base_path, relative_path)
 
@@ -1267,16 +1328,85 @@ assets_path = resource_path("assets")
 if os.path.exists(assets_path):
     app.mount("/icons", StaticFiles(directory=assets_path), name="icons")
 else:
-    print(f"Warning: Assets folder not found at {assets_path}")
+    logger.warning(f"Assets folder not found at {assets_path}")
 
 # Mount frontend dist folder
 frontend_path = resource_path("frontend/dist")
 if os.path.exists(frontend_path):
-    app.mount("/", StaticFiles(directory=frontend_path, html=True), name="static")
+    # We do NOT mount static files at root "/" yet because we need to intercept
+    # the index.html request to inject the token.
+    # We DO mount them for assets to work.
+    app.mount("/assets", StaticFiles(directory=os.path.join(frontend_path, "assets")), name="assets")
 else:
-    print(f"Warning: Frontend dist folder not found at {frontend_path}. API mode only.")
+    logger.warning(f"Frontend dist folder not found at {frontend_path}. API mode only.")
 
-# Configure logging
+# --- SPA SERVING & TOKEN INJECTION ---
+
+@app.get("/")
+@app.get("/index.html")
+async def serve_spa():
+    if not os.path.exists(frontend_path):
+         return {"status": "Cellami Backend Running (No Frontend Found)"}
+         
+    index_path = os.path.join(frontend_path, "index.html")
+    if not os.path.exists(index_path):
+        return Response("index.html not found", status_code=404)
+        
+    with open(index_path, "r", encoding="utf-8") as f:
+        html_content = f.read()
+        
+    # INJECT TOKEN
+    # We look for the <head> tag and insert our script right after it
+    injection_script = f"""
+    <script>
+        window.__CELLAMI_TOKEN__ = "{SESSION_TOKEN}";
+        console.log("Cellami: Auth Token Injected");
+    </script>
+    """
+    
+    # Simple string replacement
+    # Fallback to appending to body if head not found (unlikely)
+    if "<head>" in html_content:
+        html_content = html_content.replace("<head>", f"<head>{injection_script}", 1)
+    else:
+        html_content = injection_script + html_content
+        
+    return Response(content=html_content, media_type="text/html")
+
+# --- AUTHENTICATION ---
+# (Moved to top of file after logger init)
+
+# FLAG: Is this running in Dev mode? 
+# We assume Dev mode if we can't find the frontend build OR if explicitly set
+IS_DEV_MODE = os.environ.get("CELLAMI_DEV", "false").lower() == "true"
+if not os.path.exists(frontend_path):
+    IS_DEV_MODE = True
+
+@app.get("/api/auth/token")
+def get_auth_token(request: Request):
+    # SECURITY FIX: 
+    # 1. Allow in explicit Dev Mode
+    # 2. Allow if Origin is a trusted local dev server
+    
+    origin = request.headers.get("origin", "")
+    referer = request.headers.get("referer", "")
+    
+    # Relaxed check: Allow localhost/127.0.0.1 (common with Proxies)
+    # Python startswith accepts a tuple for multiple prefixes
+    allowed_prefixes = (
+        "http://localhost", "https://localhost",
+        "http://127.0.0.1", "https://127.0.0.1"
+    )
+    
+    is_trusted_dev = (origin and origin.startswith(allowed_prefixes)) or \
+                     (referer and referer.startswith(allowed_prefixes))
+    
+    if IS_DEV_MODE or is_trusted_dev:
+        return {"token": SESSION_TOKEN}
+    else:
+        # Return 403 Forbidden to hide the token from local port scanners
+        return Response(content="Forbidden: Token injection only.", status_code=403)
+
 # Store logs in the centralized user data directory
 LOG_FILE = os.path.join(USER_DATA_DIR, "cellami.log")
 
@@ -1290,6 +1420,12 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger(__name__)
+
+# --- AUTHENTICATION ---
+# Generate a secure session token on startup
+SESSION_TOKEN = secrets.token_hex(32)
+logger.info(f"Session Token Generated: {SESSION_TOKEN[:4]}... (hidden)")
+
 
 # --- ENVIRONMENT FIX FOR MACOS APP ---
 # When running as a .app, PATH is restricted. We need to add common paths
@@ -1341,8 +1477,17 @@ if __name__ == "__main__":
             # Prevent double logging (once by uvicorn, once by root logger)
             log_config["loggers"][logger_name]["propagate"] = False
 
+    # Force the "root" logger (used by app code) to use standard formatter and handlers
+    # This prevents Uvicorn from silencing our `logger.info(...)` calls
+    log_config["loggers"][""] = {
+        "handlers": ["default", "file"],
+        "level": "INFO",
+        "propagate": False
+    }
+
     # Define server configuration with custom log_config
-    config = uvicorn.Config(app, host="0.0.0.0", port=8000, log_level="info", log_config=log_config)
+    # B104: Bind to 127.0.0.1 (localhost) only for security
+    config = uvicorn.Config(app, host="127.0.0.1", port=8000, log_level="info", log_config=log_config)
     server = uvicorn.Server(config)
     
     def resource_path(relative_path):
@@ -1374,11 +1519,9 @@ if __name__ == "__main__":
                 # Fallback to default handler
                 subprocess.run(["open", LOG_FILE])
         elif sys.platform == "win32":
-            # Windows: Use 'start' to open a new CMD window and PowerShell to tail
-            # 'start' is a shell command, so shell=True is needed.
-            # We use PowerShell's Get-Content -Wait which is equivalent to tail -f
             try:
-                subprocess.run(f'start powershell -NoExit -Command "Get-Content -Wait \'{LOG_FILE}\'"', shell=True)
+                # Use os.startfile which is standard on Windows to open the file
+                os.startfile(LOG_FILE)
             except Exception as e:
                 print(f"Failed to open logs: {e}")
         else:
@@ -1419,4 +1562,13 @@ if __name__ == "__main__":
     server_thread.start()
     
     # Run tray icon in main thread (blocking)
+    # Close splash screen just before showing the tray (app is ready)
+    try:
+        import pyi_splash
+        if pyi_splash.is_alive():
+            pyi_splash.close()
+            logger.info("Splash screen closed.")
+    except ImportError:
+        pass
+        
     setup_tray()

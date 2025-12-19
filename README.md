@@ -125,12 +125,12 @@ pip install -r requirements.txt
 ### 2. Run Build Script
 *   **🍎 macOS (zsh):**
     ```zsh
-    ./build_app.sh
+    ./scripts/build_app.sh
     ```
     *Creates `dist/Cellami.app`*
 
 *   **🪟 Windows (PowerShell):**
     ```powershell
-    .\build_app.bat
+    .\scripts\build_app.bat
     ```
     *Creates `dist/Cellami.exe`*

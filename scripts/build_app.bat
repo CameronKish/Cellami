@@ -1,12 +1,17 @@
 @echo off
 echo 🚀 Starting Cellami Build Process (Windows)...
 
+REM Ensure we are in the project root
+pushd %~dp0
+cd ..
+
 REM 1. Build Frontend
 echo 📦 Building Frontend...
 cd frontend
 call npm run build
 if %errorlevel% neq 0 (
     echo ❌ Frontend build failed.
+    popd
     exit /b %errorlevel%
 )
 cd ..
@@ -22,7 +27,7 @@ set ICON_SOURCE=assets\Cellami_Template.png
 set ICON_DEST=assets\Cellami.ico
 
 if exist "%ICON_SOURCE%" (
-    python -c "from PIL import Image; img = Image.open(r'%ICON_SOURCE%'); img.save(r'%ICON_DEST%')"
+    .\venv312\Scripts\python.exe -c "from PIL import Image; img = Image.open(r'%ICON_SOURCE%'); img.save(r'%ICON_DEST%')"
     echo ✅ Icon generated: %ICON_DEST%
     set ICON_FLAG=--icon "%ICON_DEST%"
 ) else (
@@ -30,10 +35,11 @@ if exist "%ICON_SOURCE%" (
     set ICON_FLAG=
 )
 
-pyinstaller --name "Cellami" ^
+.\venv312\Scripts\python.exe -m PyInstaller --name "Cellami" ^
     --clean ^
     --onefile ^
     --noconsole ^
+    --splash "assets\Cellami_Desktop.png" ^
     %ICON_FLAG% ^
     --collect-all docling ^
     --collect-all docling_core ^

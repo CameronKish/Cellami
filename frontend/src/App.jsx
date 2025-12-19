@@ -5,6 +5,15 @@ import './design-system.css';
 /* global Excel, Office */
 
 const API_BASE = "/api";
+let authToken = "";
+
+const fetchAPI = async (url, options = {}) => {
+  const headers = { ...options.headers };
+  if (authToken) {
+    headers['X-API-Token'] = authToken;
+  }
+  return fetch(url, { ...options, headers });
+};
 
 // --- Reusable UI Components ---
 
@@ -73,6 +82,7 @@ const App = () => {
   const [excludedDocs, setExcludedDocs] = useState([]); // Track deselected documents
   const [isOfficeInitialized, setIsOfficeInitialized] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false); // Global processing state
+  const [isAuthReady, setIsAuthReady] = useState(false); // Wait for auth token before rendering
 
   // Viewer State
   const [viewerOpen, setViewerOpen] = useState(false);
@@ -99,7 +109,7 @@ const App = () => {
 
   const fetchSettings = async () => {
     try {
-      const res = await fetch(`${API_BASE}/settings`);
+      const res = await fetchAPI(`${API_BASE}/settings`);
       if (res.ok) {
         const data = await res.json();
         setSettings(data);
@@ -111,7 +121,7 @@ const App = () => {
 
   const refreshDocs = async () => {
     try {
-      const res = await fetch(`${API_BASE}/list-documents`);
+      const res = await fetchAPI(`${API_BASE}/list-documents`);
       if (res.ok) {
         const data = await res.json();
         setDocuments(data.documents);
@@ -122,13 +132,45 @@ const App = () => {
   };
 
   useEffect(() => {
+    const initAuth = async () => {
+      try {
+        // SECURITY FIX: Check for injected token first (Production)
+        // detailed in SOC 2 analysis
+        if (window.__CELLAMI_TOKEN__) {
+          console.log("Auth: Found injected token.");
+          authToken = window.__CELLAMI_TOKEN__;
+        } else {
+          // Fallback for Development (Vite Proxy)
+          console.log("Auth: No injected token, attempting fetch...");
+          const res = await fetchAPI(`${API_BASE}/auth/token`);
+          if (res.ok) {
+            const data = await res.json();
+            authToken = data.token;
+          } else {
+            // If fetch fails (403), it means we are in Prod but index.html wasn't injected properly
+            console.error("Auth Failed: Token endpoint is restricted and no injected token found.");
+          }
+        }
+
+        if (authToken) {
+          // Only fetch data after we have the token
+          fetchSettings();
+          refreshDocs();
+        }
+      } catch (e) {
+        console.error("Failed to initialize auth", e);
+      } finally {
+        setIsAuthReady(true);
+      }
+    };
+
     Office.onReady((info) => {
       if (info.host === Office.HostType.Excel) {
         setIsOfficeInitialized(true);
       }
     });
-    fetchSettings();
-    refreshDocs();
+
+    initAuth();
   }, []);
 
   const handleViewSource = async (filename, chunkText, sourceId = null, directContent = null) => {
@@ -143,7 +185,7 @@ const App = () => {
       // If we have a source ID, try to fetch the full text for better highlighting
       if (sourceId) {
         try {
-          const chunkRes = await fetch(`${API_BASE}/chunk/${sourceId}`);
+          const chunkRes = await fetchAPI(`${API_BASE}/chunk/${sourceId}`);
           if (chunkRes.ok) {
             const chunkData = await chunkRes.json();
             if (chunkData.text) {
@@ -155,7 +197,7 @@ const App = () => {
         }
       }
 
-      const res = await fetch(`${API_BASE}/document-content?filename=${encodeURIComponent(filename)}`);
+      const res = await fetchAPI(`${API_BASE}/document-content?filename=${encodeURIComponent(filename)}`);
       if (!res.ok) {
         if (res.status === 404) {
           alert("Source content not found. Please re-upload this document to enable the viewer.");
@@ -230,6 +272,17 @@ const App = () => {
 
   if (!isOfficeInitialized) {
     return <div className="p-4 text-slate-500">Please sideload this add-in in Excel.</div>;
+  }
+
+  if (!isAuthReady) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-slate-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+          <p className="text-slate-600">Securely connecting to Cellami...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -412,7 +465,7 @@ const QueryView = ({
       const updatedSettings = { ...settings, prompts: updatedPrompts };
 
       setDebugStatus('Sending request...');
-      const res = await fetch(`${API_BASE}/settings`, {
+      const res = await fetchAPI(`${API_BASE}/settings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatedSettings)
@@ -448,7 +501,7 @@ const QueryView = ({
       );
       const updatedSettings = { ...settings, prompts: updatedPrompts };
 
-      const res = await fetch(`${API_BASE}/settings`, {
+      const res = await fetchAPI(`${API_BASE}/settings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatedSettings)
@@ -481,7 +534,7 @@ const QueryView = ({
     const updatedSettings = { ...settings, prompts: updatedPrompts };
 
     try {
-      const res = await fetch(`${API_BASE}/settings`, {
+      const res = await fetchAPI(`${API_BASE}/settings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatedSettings)
@@ -705,7 +758,7 @@ const QueryView = ({
         setStatus('Refining queries...');
         abortControllerRef.current = new AbortController();
         try {
-          const res = await fetch(`${API_BASE}/refine-query`, {
+          const res = await fetchAPI(`${API_BASE}/refine-query`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -730,7 +783,7 @@ const QueryView = ({
               throw new Error("Refinement cancelled");
             }
 
-            const statusRes = await fetch(`${API_BASE}/batch-status/${task_id}`);
+            const statusRes = await fetchAPI(`${API_BASE}/batch-status/${task_id}`);
             if (!statusRes.ok) throw new Error("Failed to check refinement status");
 
             const statusData = await statusRes.json();
@@ -1077,7 +1130,7 @@ const QueryView = ({
 
     try {
       // 1. Start the batch job
-      const startRes = await fetch(`${API_BASE}/batch-process`, {
+      const startRes = await fetchAPI(`${API_BASE}/batch-process`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1112,7 +1165,7 @@ const QueryView = ({
           throw new Error('Operation timed out');
         }
 
-        const statusRes = await fetch(`${API_BASE}/batch-status/${task_id}`, {
+        const statusRes = await fetchAPI(`${API_BASE}/batch-status/${task_id}`, {
           signal: controller.signal
         });
 
@@ -1380,7 +1433,7 @@ const QueryView = ({
 
       if (currentTaskId) {
         try {
-          await fetch(`${API_BASE}/cancel-batch/${currentTaskId}`, { method: 'POST' });
+          await fetchAPI(`${API_BASE}/cancel-batch/${currentTaskId}`, { method: 'POST' });
         } catch (e) { console.error("Failed to cancel backend refinement task", e); }
       }
 
@@ -1392,7 +1445,7 @@ const QueryView = ({
     if (currentTaskId) {
       try {
         setStatus('Cancelling...');
-        await fetch(`${API_BASE}/cancel-batch/${currentTaskId}`, { method: 'POST' });
+        await fetchAPI(`${API_BASE}/cancel-batch/${currentTaskId}`, { method: 'POST' });
         // The polling loop will detect the 'cancelled' status or we can manually abort
         // But let's let the polling loop handle the exit to be clean
       } catch (e) {
@@ -2051,7 +2104,7 @@ const ChatView = ({ settings, handleViewSource, activeDocs = [], onProcessingCha
       // Explicitly request model unload to ensure backend stops processing
       try {
         const modelName = settings?.config?.model_name || 'llama3';
-        await fetch(`${API_BASE}/unload-model`, {
+        await fetchAPI(`${API_BASE}/unload-model`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ model: modelName })
@@ -2081,7 +2134,7 @@ const ChatView = ({ settings, handleViewSource, activeDocs = [], onProcessingCha
     abortControllerRef.current = controller;
 
     try {
-      const res = await fetch(`${API_BASE}/chat`, {
+      const res = await fetchAPI(`${API_BASE}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -2590,7 +2643,7 @@ const KnowledgeView = ({ documents, refreshDocs, excludedDocs = [], setExcludedD
     formData.append('file', file);
 
     try {
-      const response = await fetch(`${API_BASE}/add-document`, {
+      const response = await fetchAPI(`${API_BASE}/add-document`, {
         method: 'POST',
         body: formData,
       });
@@ -2604,7 +2657,7 @@ const KnowledgeView = ({ documents, refreshDocs, excludedDocs = [], setExcludedD
 
       const pollInterval = setInterval(async () => {
         try {
-          const statusRes = await fetch(`${API_BASE}/task/${task_id}`);
+          const statusRes = await fetchAPI(`${API_BASE}/task/${task_id}`);
           if (statusRes.ok) {
             const task = await statusRes.json();
 
@@ -2662,7 +2715,7 @@ const KnowledgeView = ({ documents, refreshDocs, excludedDocs = [], setExcludedD
   const confirmDelete = async () => {
     if (!fileToDelete) return;
     try {
-      await fetch(`${API_BASE}/remove-document`, {
+      await fetchAPI(`${API_BASE}/remove-document`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ filename: fileToDelete })
@@ -2676,7 +2729,7 @@ const KnowledgeView = ({ documents, refreshDocs, excludedDocs = [], setExcludedD
 
   const handleInspect = async (filename) => {
     try {
-      const res = await fetch(`${API_BASE}/document-chunks?filename=${encodeURIComponent(filename)}`);
+      const res = await fetchAPI(`${API_BASE}/document-chunks?filename=${encodeURIComponent(filename)}`);
       if (!res.ok) throw new Error("Failed to fetch chunks");
       const data = await res.json();
       const chunks = data.chunks;
@@ -2953,7 +3006,7 @@ const AuditView = () => {
             const fetchedSources = [];
             for (const item of idMatches) {
               try {
-                const res = await fetch(`${API_BASE}/chunk/${item.id}`);
+                const res = await fetchAPI(`${API_BASE}/chunk/${item.id}`);
                 if (res.ok) {
                   const chunk = await res.json();
                   fetchedSources.push({ ...chunk, score: item.score });
@@ -3004,7 +3057,7 @@ const AuditView = () => {
 
       setLoadingContent(true);
       try {
-        const res = await fetch(`${API_BASE}/document-content?filename=${encodeURIComponent(filename)}`);
+        const res = await fetchAPI(`${API_BASE}/document-content?filename=${encodeURIComponent(filename)}`);
         if (res.ok) {
           const data = await res.json();
           setDocumentCache(prev => ({ ...prev, [filename]: data.content }));
@@ -3247,7 +3300,7 @@ const SettingsView = ({
   useEffect(() => {
     const fetchModels = async () => {
       try {
-        const res = await fetch(`${API_BASE}/list-models`);
+        const res = await fetchAPI(`${API_BASE}/list-models`);
         if (res.ok) {
           const data = await res.json();
           setAvailableModels(data.models);
@@ -3262,7 +3315,7 @@ const SettingsView = ({
   const save = async () => {
     setSaveStatus('saving');
     try {
-      const res = await fetch(`${API_BASE}/settings`, {
+      const res = await fetchAPI(`${API_BASE}/settings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...settings, config })
@@ -3289,7 +3342,7 @@ const SettingsView = ({
       setBenchmarkProgress(`Testing ${model} (${i + 1}/${availableModels.length})...`);
 
       try {
-        const res = await fetch(`${API_BASE}/benchmark-model`, {
+        const res = await fetchAPI(`${API_BASE}/benchmark-model`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ model })

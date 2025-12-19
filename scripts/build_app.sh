@@ -2,6 +2,14 @@
 
 echo "🚀 Starting Cellami Build Process..."
 
+# Ensure we are in the project root (parent of 'scripts' directory)
+# Get the directory where the script is located
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+# If the script is in a 'scripts' subdirectory, move up one level
+if [[ "$SCRIPT_DIR" == */scripts ]]; then
+    cd "$SCRIPT_DIR/.."
+fi
+
 # 1. Build Frontend
 echo "📦 Building Frontend..."
 cd frontend
@@ -45,9 +53,9 @@ else
 fi
 
 # Run PyInstaller
-pyinstaller --name "Cellami" \
+./venv312/bin/python -m PyInstaller --name "Cellami" \
     --clean \
-    --onefile \
+    --onedir \
     --windowed \
     --icon "assets/Cellami.icns" \
     --collect-all docling \
