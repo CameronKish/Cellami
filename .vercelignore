@@ -1,0 +1,15 @@
+# Ignore backend and system files
+*.py
+requirements.txt
+venv312/
+venv/
+build/
+dist/
+scripts/
+manifest.xml
+manifest.prod.xml
+store_package/
+
+# Keep only frontend and assets
+!frontend/
+!assets/
