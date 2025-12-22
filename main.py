@@ -131,12 +131,26 @@ async def auth_middleware(request: Request, call_next):
     # Check Token
     token = request.headers.get("X-API-Token")
     if token != SESSION_TOKEN:
+         logger.warning(f"Auth Failed! Header Token: '{token}' vs Session Token: '{SESSION_TOKEN}' | Path: {request.url.path}")
          return Response(content="Unauthorized", status_code=401)
          
     return await call_next(request)
 
 
 # Enable CORS for Office Add-in and Production Frontend
+
+
+@app.middleware("http")
+async def add_pna_header(request: Request, call_next):
+    response = await call_next(request)
+    origin = request.headers.get("Origin")
+    if origin == "https://cellami.vercel.app":
+        # Manually inject ALL required PNA/CORS headers since CORSMiddleware is dropping them
+        response.headers["Access-Control-Allow-Private-Network"] = "true"
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true" 
+    return response
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -151,8 +165,8 @@ app.add_middleware(
         "https://cellami.vercel.app", # Vercel Deployment
     ],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "OPTIONS", "DELETE", "PUT"],
+    allow_headers=["Content-Type", "Authorization", "X-API-Token", "X-Requested-With"],
     expose_headers=["X-Sources"],
 )
 
@@ -1482,11 +1496,16 @@ def get_auth_token(request: Request):
         "http://127.0.0.1", "https://127.0.0.1"
     )
     
-    is_trusted_dev = (origin and origin.startswith(allowed_prefixes)) or \
-                     (referer and referer.startswith(allowed_prefixes))
+    # Check 1: Is it Vercel? (Explicit Trust)
+    is_vercel = origin == "https://cellami.vercel.app"
     
-    logger.info(f"Token requested by Origin: {origin} (Trusted: {is_trusted_dev})")
-
+    # Check 2: Is it Localhost? (Prefix check)
+    is_local = (origin and origin.startswith(allowed_prefixes)) or \
+               (referer and referer.startswith(allowed_prefixes))
+               
+    is_trusted_dev = is_vercel or is_local
+    
+    
     if IS_DEV_MODE or is_trusted_dev:
         return {"token": SESSION_TOKEN}
     else:

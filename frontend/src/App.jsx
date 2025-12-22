@@ -164,15 +164,19 @@ const App = () => {
         console.log("Auth: Token fetch success.");
         return data.token;
       } else {
-        console.warn("Auth: Token fetch failed with status:", res.status);
+        const msg = `Auth Check Failed: ${res.status} ${res.statusText}`;
+        console.warn(msg);
+        setConnectionErrorMessage(msg);
       }
     } catch (e) {
       console.warn("Auth: Connector logic skipped/failed:", e);
+      setConnectionErrorMessage(`Auth Fetch Error: ${e.message}`);
     }
     return null;
   }, []);
 
   const [connectionError, setConnectionError] = useState(false);
+  const [connectionErrorMessage, setConnectionErrorMessage] = useState("");
 
   useEffect(() => {
     const initAuth = async () => {
@@ -191,12 +195,15 @@ const App = () => {
               refreshDocs(); // Fire and forget
               setConnectionError(false);
             } else {
-              console.warn("Init: Settings fetch failed:", res.status);
+              const msg = `Init Settings Failed: ${res.status} ${res.statusText}`;
+              console.warn(msg);
+              setConnectionErrorMessage(msg);
               // Strictly fail if we can't get settings (e.g. 401 from stale token, or backend error)
               setConnectionError(true);
             }
           } catch (e) {
             console.error("Health check failed:", e);
+            setConnectionErrorMessage(`Health Check Error: ${e.message}`);
             setConnectionError(true);
           }
         } else {
@@ -276,7 +283,10 @@ const App = () => {
       } catch (e) {
         // Network Error or Timeout => Backend is likely down
         console.warn("Heartbeat missed:", e);
-        if (!connectionError) setConnectionError(true);
+        if (!connectionError) {
+          setConnectionErrorMessage(`Heartbeat Lost: ${e.message}`);
+          setConnectionError(true);
+        }
       }
     };
 
@@ -384,7 +394,7 @@ const App = () => {
 
   // --- Sub Components ---
 
-  const ConnectionError = () => (
+  const ConnectionError = ({ message }) => (
     <div className="flex flex-col min-h-screen items-center justify-center bg-slate-50 p-6 text-center">
       {/* Brand Logo with Glow Effect */}
       <div className="mb-8 relative">
@@ -398,7 +408,7 @@ const App = () => {
 
       <h2 className="text-2xl font-bold text-slate-900 mb-3 tracking-tight">Connection Failed</h2>
 
-      <p className="text-slate-600 max-w-sm mb-10 leading-relaxed font-medium">
+      <p className="text-slate-600 max-w-sm mb-4 leading-relaxed font-medium">
         Cellami is not reachable.<br />
         Please ensure the Cellami app is running.
       </p>
@@ -410,6 +420,20 @@ const App = () => {
         Retry Connection
       </button>
 
+      {/* Subtle Error Message (Bottom Left) */}
+      {message && (
+        <div className="fixed bottom-2 left-2 max-w-[60%] text-left">
+          <pre className="text-red-400/80 text-[10px] font-mono break-words whitespace-pre-wrap">
+            {message}
+          </pre>
+        </div>
+      )}
+
+      {/* Build Timestamp (Bottom Right) */}
+      <div className="fixed bottom-2 right-2 text-[10px] text-slate-400 font-mono opacity-50">
+        Build: {__BUILD_TIMESTAMP__}
+      </div>
+
     </div>
   );
 
@@ -418,7 +442,7 @@ const App = () => {
   }
 
   if (connectionError) {
-    return <ConnectionError />;
+    return <ConnectionError message={connectionErrorMessage} />;
   }
 
   if (!isAuthReady) {

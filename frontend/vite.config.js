@@ -52,7 +52,8 @@ export default defineConfig({
     })
   ],
   define: {
-    __APP_VERSION__: JSON.stringify(version)
+    __APP_VERSION__: JSON.stringify(version),
+    __BUILD_TIMESTAMP__: JSON.stringify(new Date().toLocaleString('en-US', { timeZone: 'America/New_York', dateStyle: 'short', timeStyle: 'short' }) + ' EST')
   },
   server: {
     port: 3000,
