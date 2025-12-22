@@ -2,16 +2,23 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import './index.css';
 import './design-system.css';
 
+import rehypeSanitize from 'rehype-sanitize';
 /* global Excel, Office */
 
-const API_BASE = "/api";
+// In production (hosted PWA), we must point to the local loopback backend.
+// In development (Vite), we use the proxy set in vite.config.js.
+const API_BASE = import.meta.env.PROD ? "http://127.0.0.1:8000/api" : "/api";
+
 let authToken = "";
 
 const fetchAPI = async (url, options = {}) => {
-  const headers = { ...options.headers };
-  if (authToken) {
-    headers['X-API-Token'] = authToken;
+  if (!authToken) {
+    console.warn(`Blocked API call to ${url} because authToken is missing.`);
+    // Return a fake 401 response so the caller handles it, but backend is never hit.
+    return { ok: false, status: 401, json: async () => ({ error: "No client token" }) };
   }
+  const headers = { ...options.headers };
+  headers['X-API-Token'] = authToken;
   return fetch(url, { ...options, headers });
 };
 
@@ -72,6 +79,7 @@ import MarkdownViewer from './components/MarkdownViewer';
 import Markdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import remarkGfm from 'remark-gfm';
+import DownloadPage from './components/DownloadPage';
 
 // ... (existing imports)
 
@@ -89,6 +97,14 @@ const App = () => {
   const [viewerContent, setViewerContent] = useState('');
   const [viewerHighlight, setViewerHighlight] = useState('');
   const [viewerFilename, setViewerFilename] = useState('');
+
+  // About Modal State
+  const [showAbout, setShowAbout] = useState(false);
+
+  // Close source viewer when switching tabs
+  useEffect(() => {
+    setViewerOpen(false);
+  }, [activeTab]);
 
   // Load persisted state for formatting options
   const loadPersistedState = () => {
@@ -131,34 +147,67 @@ const App = () => {
     }
   };
 
+  // Helper: Fetch a new token (used for init and auto-recovery)
+  const fetchToken = useCallback(async () => {
+    try {
+      // 1. Check for Injected Token (Production)
+      if (window.__CELLAMI_TOKEN__) {
+        console.log("Auth: Found injected token.");
+        return window.__CELLAMI_TOKEN__;
+      }
+
+      // 2. Fetch from backend
+      // Add cache: no-store AND timestamp to force-bust any aggressive SW/Browser caching
+      const res = await fetch(`${API_BASE}/auth/token?t=${Date.now()}`, { cache: "no-store" });
+      if (res.ok) {
+        const data = await res.json();
+        console.log("Auth: Token fetch success.");
+        return data.token;
+      } else {
+        console.warn("Auth: Token fetch failed with status:", res.status);
+      }
+    } catch (e) {
+      console.warn("Auth: Connector logic skipped/failed:", e);
+    }
+    return null;
+  }, []);
+
+  const [connectionError, setConnectionError] = useState(false);
+
   useEffect(() => {
     const initAuth = async () => {
       try {
-        // SECURITY FIX: Check for injected token first (Production)
-        // detailed in SOC 2 analysis
-        if (window.__CELLAMI_TOKEN__) {
-          console.log("Auth: Found injected token.");
-          authToken = window.__CELLAMI_TOKEN__;
-        } else {
-          // Fallback for Development (Vite Proxy)
-          console.log("Auth: No injected token, attempting fetch...");
-          const res = await fetchAPI(`${API_BASE}/auth/token`);
-          if (res.ok) {
-            const data = await res.json();
-            authToken = data.token;
-          } else {
-            // If fetch fails (403), it means we are in Prod but index.html wasn't injected properly
-            console.error("Auth Failed: Token endpoint is restricted and no injected token found.");
-          }
-        }
+        const token = await fetchToken();
 
-        if (authToken) {
-          // Only fetch data after we have the token
-          fetchSettings();
-          refreshDocs();
+        // 3. If we received a token, verify connectivity/health
+        if (token) {
+          authToken = token; // Set global
+          try {
+            // Use settings fetch as a health check
+            const res = await fetchAPI(`${API_BASE}/settings`);
+            if (res.ok) {
+              const data = await res.json();
+              setSettings(data);
+              refreshDocs(); // Fire and forget
+              setConnectionError(false);
+            } else {
+              console.warn("Init: Settings fetch failed:", res.status);
+              // Strictly fail if we can't get settings (e.g. 401 from stale token, or backend error)
+              setConnectionError(true);
+            }
+          } catch (e) {
+            console.error("Health check failed:", e);
+            setConnectionError(true);
+          }
+        } else {
+          // No token found (Backend likely down)
+          // Strictly fail connection to prevent empty UI
+          console.warn("Init: No token found. Backend is down.");
+          setConnectionError(true);
         }
       } catch (e) {
         console.error("Failed to initialize auth", e);
+        setConnectionError(true);
       } finally {
         setIsAuthReady(true);
       }
@@ -171,7 +220,70 @@ const App = () => {
     });
 
     initAuth();
-  }, []);
+  }, [fetchToken]);
+
+  // --- Heartbeat: Monitor Backend Connection ---
+  useEffect(() => {
+    // Only start monitoring after initial auth attempt is complete
+    if (!isAuthReady) return;
+
+    const checkHealth = async () => {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2000);
+
+        // SMART HEARTBEAT:
+        // If we don't have a token, pinging /settings will just cause a 401 log spam.
+        // Instead, we should try to GET a token (Token Polling).
+        if (!authToken) {
+          // console.log("Heartbeat: No token, attempting to acquire...");
+          const newToken = await fetchToken();
+          if (newToken) {
+            // console.log("Heartbeat: Acquired token!");
+            authToken = newToken;
+            setConnectionError(false); // We are back online!
+          } else {
+            // Still no token (backend likely down or still starting)
+            if (!connectionError) setConnectionError(true);
+          }
+          return;
+        }
+
+        // If we DO have a token, verify it's still good by checking settings
+        const res = await fetchAPI(`${API_BASE}/settings`, { signal: controller.signal });
+        clearTimeout(timeoutId);
+
+        if (res.ok) {
+          if (connectionError) setConnectionError(false);
+        } else {
+          // 4xx/5xx means server IS reachable but unhappy.
+          if (res.status === 401) {
+            // Token expired or invalid (e.g. backend restarted).
+            // Attempt to Auto-Heal by fetching a new token!
+            // console.log("Heartbeat: 401 Unauthorized. Attempting to re-auth...");
+            const newToken = await fetchToken();
+            if (newToken) {
+              // console.log("Heartbeat: Re-auth successful!");
+              authToken = newToken;
+              setConnectionError(false);
+            } else {
+              // console.warn("Heartbeat: Re-auth failed.");
+              if (!connectionError) setConnectionError(true);
+            }
+          }
+          // Other errors (500, 404) we might ignore for heartbeat purposes
+        }
+      } catch (e) {
+        // Network Error or Timeout => Backend is likely down
+        console.warn("Heartbeat missed:", e);
+        if (!connectionError) setConnectionError(true);
+      }
+    };
+
+    // Check every 3 seconds for responsive feedback
+    const interval = setInterval(checkHealth, 3000);
+    return () => clearInterval(interval);
+  }, [isAuthReady, connectionError, fetchToken]);
 
   const handleViewSource = async (filename, chunkText, sourceId = null, directContent = null) => {
     if (directContent) {
@@ -270,8 +382,43 @@ const App = () => {
     }
   };
 
+  // --- Sub Components ---
+
+  const ConnectionError = () => (
+    <div className="flex flex-col min-h-screen items-center justify-center bg-slate-50 p-6 text-center">
+      {/* Brand Logo with Glow Effect */}
+      <div className="mb-8 relative">
+        <div className="absolute inset-0 bg-sky-400/20 blur-[50px] rounded-full"></div>
+        <img
+          src="/Cellami_Template.png"
+          alt="Cellami Logo"
+          className="relative w-24 h-24 object-contain drop-shadow-xl"
+        />
+      </div>
+
+      <h2 className="text-2xl font-bold text-slate-900 mb-3 tracking-tight">Connection Failed</h2>
+
+      <p className="text-slate-600 max-w-sm mb-10 leading-relaxed font-medium">
+        Cellami is not reachable.<br />
+        Please ensure the Cellami app is running.
+      </p>
+
+      <button
+        onClick={() => window.location.reload()}
+        className="min-w-[200px] px-8 py-4 rounded-full bg-sky-600 hover:bg-sky-500 text-white font-bold text-lg shadow-lg shadow-sky-200 transition-all transform hover:-translate-y-1 active:scale-95"
+      >
+        Retry Connection
+      </button>
+
+    </div>
+  );
+
   if (!isOfficeInitialized) {
-    return <div className="p-4 text-slate-500">Please sideload this add-in in Excel.</div>;
+    return <DownloadPage />;
+  }
+
+  if (connectionError) {
+    return <ConnectionError />;
   }
 
   if (!isAuthReady) {
@@ -279,28 +426,40 @@ const App = () => {
       <div className="flex h-screen items-center justify-center bg-slate-50">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-          <p className="text-slate-600">Securely connecting to Cellami...</p>
+          <p className="text-slate-600">Connecting to Cellami...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-screen bg-slate-50 text-slate-800 font-sans overflow-hidden selection:bg-indigo-100 selection:text-indigo-900">
+    <div className="h-screen app-glass-bg font-sans overflow-hidden selection:bg-indigo-100 selection:text-indigo-900">
       {/* Fixed Header / Navigation */}
-      <header style={{
-        background: 'var(--color-bg-surface)',
-        borderBottom: '1px solid var(--color-border-light)',
-        boxShadow: 'var(--shadow-sm)',
-        position: 'relative' // Needed for absolute positioning of progress bar if we wanted one, but here just for context
-      }}>
+      <header className="glass-header">
         <div style={{
           width: '100%',
-          padding: '0 16px',
+          height: '100%',
+          padding: '0 52px 0 16px',
           borderTop: isProcessing ? '4px solid var(--color-primary)' : 'none',
-          transition: 'border-top 0.3s ease'
+          transition: 'border-top 0.3s ease',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px'
         }}>
-          <nav className="tabs" style={{ marginBottom: 0 }}>
+          {/* App Logo */}
+          <div
+            className="flex-shrink-0 cursor-pointer group"
+            onClick={() => setShowAbout(true)}
+            title="About Cellami"
+          >
+            <img
+              src="/Cellami_Template.png"
+              alt="Cellami"
+              className="w-8 h-8 object-contain opacity-60 group-hover:opacity-100 group-hover:scale-110 group-hover:drop-shadow-md transition-all duration-300 ease-out"
+            />
+          </div>
+
+          <nav className="tabs" style={{ marginBottom: 0, flex: 1, overflowX: 'auto', scrollbarWidth: 'none' }}>
             {['query', 'chat', 'docs', 'audit', 'settings'].map((tab) => (
               <button
                 key={tab}
@@ -317,8 +476,8 @@ const App = () => {
         </div>
       </header>
 
-      {/* Main Content Area - Fixed, no scroll here */}
-      <main className="flex-1 overflow-hidden relative">
+      {/* Main Content Area - Overlays to allow scrolling behind header */}
+      <main className="glass-content-wrapper">
         <div className="h-full w-full mx-auto">
           {renderContent()}
         </div>
@@ -331,6 +490,46 @@ const App = () => {
         highlightText={viewerHighlight}
         filename={viewerFilename}
       />
+
+      {/* About Modal */}
+      {showAbout && (
+        <div
+          className="fixed inset-0 z-[3000] flex items-center justify-center bg-white/70 backdrop-blur-md animate-in fade-in duration-300"
+          onClick={() => setShowAbout(false)}
+        >
+          <div
+            className="glass-panel p-8 max-w-[320px] w-full relative overflow-hidden text-center animate-in zoom-in-95 duration-200"
+            onClick={e => e.stopPropagation()}
+            style={{
+              border: '1px solid rgba(255,255,255,0.5)',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
+              borderRadius: '24px'
+            }}
+          >
+            {/* Background Glow */}
+            <div className="absolute -top-24 -left-24 w-48 h-48 bg-sky-400/10 blur-[60px] rounded-full"></div>
+            <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-indigo-400/10 blur-[60px] rounded-full"></div>
+
+            <div className="flex justify-center mb-6 relative">
+              <div className="absolute inset-0 bg-sky-400/20 blur-[50px] rounded-full"></div>
+              <img src="/Cellami_Template.png" alt="Cellami Logo" className="w-16 h-16 drop-shadow-lg relative" />
+            </div>
+
+            <h2 className="text-2xl font-bold text-slate-800 mb-1" style={{ letterSpacing: '-0.02em' }}>Cellami</h2>
+            <p className="text-sky-600 font-mono text-xs mb-6 font-bold tracking-wider">VERSION {typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.2.0'}</p>
+
+            <p className="text-slate-600 text-sm leading-relaxed mb-8">
+              The intelligent companion for Excel.<br />
+              Local. Private. Secure.
+            </p>
+
+            <div className="flex flex-col gap-3">
+              <button onClick={() => setShowAbout(false)} className="btn btn-primary w-full py-2.5" style={{ borderRadius: '12px' }}>Close</button>
+              <p className="text-slate-400 text-[9px] uppercase tracking-[0.2em] mt-2 font-bold opacity-80">Empowering Data Analysts</p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -341,11 +540,8 @@ const QueryView = ({
   settings,
   refreshSettings,
   includeColors,
-  setIncludeColors,
   includeStyles,
-  setIncludeStyles,
   debugPrompts,
-  setDebugPrompts,
   activeDocs = [], // Default to empty array if not provided
   onProcessingChange
 }) => {
@@ -371,7 +567,8 @@ const QueryView = ({
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState('');
   const [updateSuccess, setUpdateSuccess] = useState(false);
-  const [debugStatus, setDebugStatus] = useState('');
+  // const [debugStatus, setDebugStatus] = useState('');
+  const [, setDebugStatus] = useState('');
   const [outputLocation, setOutputLocation] = useState(persisted.outputLocation || 'right');
   const [isSaving, setIsSaving] = useState(false);
   const [saveName, setSaveName] = useState('');
@@ -388,7 +585,7 @@ const QueryView = ({
   const [refinementStrategy, setRefinementStrategy] = useState(persisted.refinementStrategy || 'review'); // 'none', 'auto', 'review'
 
   // Iterative Processing State
-  const [iterationCount, setIterationCount] = useState(1);
+  // const [iterationCount, setIterationCount] = useState(1);
   const [analyzeSequentially, setAnalyzeSequentially] = useState(false);
   const [sequenceMode, setSequenceMode] = useState('row'); // 'row' or 'col'
   const [smartDetectionMsg, setSmartDetectionMsg] = useState(null);
@@ -546,6 +743,7 @@ const QueryView = ({
         setIsDeleting(false);
       }
     } catch (e) {
+      console.warn("Deleted prompt failure", e);
       alert("Failed to delete prompt");
     }
   };
@@ -687,7 +885,7 @@ const QueryView = ({
         // Remove color tags
         clean = clean.replace(/ \[bg:#[0-9a-fA-F]{3}\]/g, "").replace(/ \[fg:#[0-9a-fA-F]{3}\]/g, "");
         // Remove bold/italic wrappers
-        clean = clean.replace(/^[\*]+|[\*]+$/g, "");
+        clean = clean.replace(/^[*\s]+|[*\s]+$/g, "");
         return clean;
       }));
     } else {
@@ -1455,7 +1653,8 @@ const QueryView = ({
   };
 
   return (
-    <div style={{ height: '100%', overflow: 'auto', overflowX: 'hidden', padding: 'var(--space-xs)', background: 'var(--color-bg-base)' }}>
+    <div style={{ height: '100%', overflowY: 'auto', padding: '44px var(--space-xs) var(--space-xs)', background: 'transparent' }}>
+      <div style={{ height: '1px', background: 'rgba(255, 255, 255, 0.6)', position: 'fixed', top: '44px', left: 0, right: 0, zIndex: 1001, boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }} />
       <div className="container" style={{ maxWidth: '100%' }}>
 
         {/* Mode Tabs */}
@@ -1707,7 +1906,7 @@ const QueryView = ({
           {isDeleting && (
             <div style={{ marginBottom: 'var(--space-md)', padding: 'var(--space-md)', background: 'var(--color-error-bg)', border: '1px solid var(--color-error)', borderRadius: 'var(--radius-md)' }}>
               <p style={{ fontSize: 'var(--font-size-base)', color: 'var(--color-text-primary)', fontWeight: 'var(--font-weight-medium)', marginBottom: 'var(--space-md)' }}>Delete "{settings.prompts.find(p => p.id.toString() === selectedPromptId)?.name}"?</p>
-              <div style={{ display: 'flex', gap: 'var(--space-sm)' }}>
+              <div style={{ display: 'flex', gap: 'var(--space-sm)', justifyContent: 'flex-end' }}>
                 <button className="btn btn-danger" onClick={confirmDelete}>Delete</button>
                 <button className="btn btn-secondary" onClick={cancelDelete}>Cancel</button>
               </div>
@@ -1960,7 +2159,8 @@ const ChatView = ({ settings, handleViewSource, activeDocs = [], onProcessingCha
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [showOverwriteConfirm, setShowOverwriteConfirm] = useState(false);
   const [chatUseRag, setChatUseRag] = useState(false);
-  const [chatAttachedData, setChatAttachedData] = useState(null); // { text: string, summary: string }
+  const [chatAttachedData, setChatAttachedData] = useState(null); // {text: string, summary: string }
+  const [pendingExportText, setPendingExportText] = useState(null);
   const messagesEndRef = useRef(null);
   const abortControllerRef = useRef(null);
 
@@ -1999,6 +2199,22 @@ const ChatView = ({ settings, handleViewSource, activeDocs = [], onProcessingCha
       return;
     }
 
+    const chatText = messages.map(msg => {
+      const role = msg.role === 'user' ? 'You' : msg.role === 'assistant' ? 'AI' : 'System';
+      return `[${role}]: ${msg.content}`;
+    }).join('\n\n');
+
+    await initiateExport(chatText);
+  };
+
+  const handleExportMessage = async (msg) => {
+    if (!msg || !msg.content) return;
+    await initiateExport(msg.content);
+  };
+
+  const initiateExport = async (text) => {
+    if (!text) return;
+
     try {
       await Excel.run(async (context) => {
         const range = context.workbook.getSelectedRange();
@@ -2008,49 +2224,45 @@ const ChatView = ({ settings, handleViewSource, activeDocs = [], onProcessingCha
         // Check if cell has content
         const currentValue = range.values[0][0];
         if (currentValue && currentValue.toString().trim() !== '') {
-          // Show confirmation modal
+          // Store text for confirmation and show modal
+          setPendingExportText(text);
           setShowOverwriteConfirm(true);
           return;
         }
 
         // If cell is empty, export directly
-        await performExport(context, range);
+        await performExport(context, range, text);
       });
     } catch (e) {
       console.error('Export failed:', e);
     }
   };
 
-  const performExport = async (context, range) => {
-    // Format chat messages as text
-    const chatText = messages.map(msg => {
-      const role = msg.role === 'user' ? 'You' : msg.role === 'assistant' ? 'AI' : 'System';
-      return `[${role}]: ${msg.content}`;
-    }).join('\n\n');
-
-    range.values = [[chatText]];
+  const performExport = async (context, range, text) => {
+    range.values = [[text]];
     range.format.wrapText = true;
     range.format.verticalAlignment = "Top";
-
     await context.sync();
   };
 
   const confirmOverwrite = async () => {
+    if (!pendingExportText) return;
     try {
       // Create a fresh Excel context to export
       await Excel.run(async (context) => {
         const range = context.workbook.getSelectedRange();
-        await performExport(context, range);
+        await performExport(context, range, pendingExportText);
       });
     } catch (e) {
       console.error('Export failed:', e);
     }
     setShowOverwriteConfirm(false);
-    setPendingExport(null);
+    setPendingExportText(null);
   };
 
   const cancelOverwrite = () => {
     setShowOverwriteConfirm(false);
+    setPendingExportText(null);
   };
 
   const handleAddSelection = async () => {
@@ -2202,62 +2414,13 @@ const ChatView = ({ settings, handleViewSource, activeDocs = [], onProcessingCha
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--color-bg-base)' }}>
-      {/* Header with action buttons */}
-      <div style={{
-        flexShrink: 0,
-        padding: 'var(--space-md) var(--space-lg)',
-        background: 'var(--color-bg-surface)',
-        borderBottom: '1px solid var(--color-border-light)',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        gap: 'var(--space-sm)'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-md)' }}>
-          <h2 className="heading-3" style={{ margin: 0 }}>Chat</h2>
-          <label className="checkbox" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 'var(--space-sm)', cursor: 'pointer' }}>
-            <input
-              type="checkbox"
-              checked={chatUseRag}
-              onChange={(e) => setChatUseRag(e.target.checked)}
-              id="chat-use-kb"
-              style={{ width: '16px', height: '16px', cursor: 'pointer' }}
-            />
-            <span style={{ fontSize: 'var(--font-size-base)', userSelect: 'none' }}>Use Docs</span>
-          </label>
-        </div>
-        <div style={{ display: 'flex', gap: 'var(--space-xs)' }}>
-          <button
-            className="btn btn-ghost btn-sm"
-            onClick={handleExportToExcel}
-            disabled={messages.length === 0}
-            title="Export chat to Excel"
-          >
-            <svg style={{ width: '14px', height: '14px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-            </svg>
-            Export
-          </button>
-          <button
-            className="btn btn-ghost btn-sm"
-            onClick={handleClearChat}
-            disabled={messages.length === 0}
-            title="Clear chat history"
-            style={{ color: messages.length > 0 ? 'var(--color-text-tertiary)' : undefined }}
-            onMouseEnter={(e) => messages.length > 0 && (e.currentTarget.style.color = 'var(--color-error)')}
-            onMouseLeave={(e) => messages.length > 0 && (e.currentTarget.style.color = 'var(--color-text-tertiary)')}
-          >
-            <svg style={{ width: '14px', height: '14px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-            </svg>
-            Clear
-          </button>
-        </div>
-      </div>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'transparent', overflowY: 'auto', position: 'relative' }}>
+      {/* Spacer for the absolute app header */}
+      <div style={{ height: '44px', flexShrink: 0 }} />
+
 
       {/* Messages Area */}
-      <div style={{ flex: 1, overflow: 'auto', padding: 'var(--space-lg)', display: 'flex', flexDirection: 'column', gap: 'var(--space-lg)' }}>
+      <div style={{ flex: 1, padding: 'var(--space-lg)', display: 'flex', flexDirection: 'column', gap: 'var(--space-lg)' }}>
         {messages.length === 0 && (
           <div style={{
             textAlign: 'center',
@@ -2289,130 +2452,197 @@ const ChatView = ({ settings, handleViewSource, activeDocs = [], onProcessingCha
 
         {messages.map((msg, i) => (
           <div key={i} style={{
-            alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
-            maxWidth: '80%',
-            background: msg.role === 'user' ? 'var(--color-primary)' : 'var(--color-bg-hover)',
-            color: msg.role === 'user' ? 'white' : 'var(--color-text-primary)',
-            padding: 'var(--space-md)',
-            borderRadius: 'var(--radius-lg)',
-            borderBottomRightRadius: msg.role === 'user' ? 'var(--radius-xs)' : 'var(--radius-lg)',
-            borderBottomLeftRadius: msg.role !== 'user' ? 'var(--radius-xs)' : 'var(--radius-lg)',
-            boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
+            display: 'flex',
+            width: '100%',
+            justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
+            alignItems: 'center',
+            gap: 'var(--space-md)',
+            position: 'relative'
           }}>
-            {/* Context Data Chip */}
-            {msg.context_summary && (
-              <div style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 'var(--space-xs)',
-                padding: '2px 6px',
-                background: 'rgba(255,255,255,0.2)',
-                borderRadius: 'var(--radius-sm)',
-                fontSize: 'var(--font-size-xs)',
-                marginBottom: 'var(--space-xs)',
-                color: 'inherit'
-              }}>
-                <svg style={{ width: '10px', height: '10px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+            {/* Export Button - Left side for User bubble */}
+            {msg.role === 'user' && !loading && msg.content && msg.role !== 'system' && (
+              <button
+                className="btn btn-ghost btn-sm"
+                style={{
+                  width: '24px',
+                  height: '24px',
+                  padding: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: '50%',
+                  background: 'rgba(255,255,255,0.4)',
+                  backdropFilter: 'blur(8px)',
+                  border: '1px solid rgba(255,255,255,0.4)',
+                  color: 'var(--color-primary)',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
+                  transition: 'all 0.2s',
+                  flexShrink: 0
+                }}
+                onClick={() => handleExportMessage(msg)}
+                title="Export this message to Excel cell"
+              >
+                <svg style={{ width: '12px', height: '12px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                 </svg>
-                {msg.context_summary}
-              </div>
+              </button>
             )}
 
-            <div style={{ whiteSpace: msg.role === 'user' ? 'pre-wrap' : 'normal', lineHeight: 1.5 }}>
+            <div style={{
+              maxWidth: '80%',
+              background: msg.role === 'user' ? 'rgba(0, 107, 255, 0.85)' : 'rgba(255, 255, 255, 0.3)',
+              backdropFilter: 'blur(10px)',
+              WebkitBackdropFilter: 'blur(10px)',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              color: msg.role === 'user' ? 'white' : 'var(--color-text-primary)',
+              padding: 'var(--space-md)',
+              borderRadius: 'var(--radius-lg)',
+              borderBottomRightRadius: msg.role === 'user' ? 'var(--radius-xs)' : 'var(--radius-lg)',
+              borderBottomLeftRadius: msg.role !== 'user' ? 'var(--radius-xs)' : 'var(--radius-lg)',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
+              position: 'relative'
+            }}>
+              {/* Context Data Chip */}
+              {msg.context_summary && (
+                <div style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 'var(--space-xs)',
+                  padding: '2px 6px',
+                  background: 'rgba(255,255,255,0.2)',
+                  borderRadius: 'var(--radius-sm)',
+                  fontSize: 'var(--font-size-xs)',
+                  marginBottom: 'var(--space-xs)',
+                  color: 'inherit'
+                }}>
+                  <svg style={{ width: '10px', height: '10px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                  </svg>
+                  {msg.context_summary}
+                </div>
+              )}
 
-              {(() => {
-                // Generic loading indicator for empty assistant message
-                if (msg.role === 'assistant' && !msg.content.trim() && loading && i === messages.length - 1) {
+              <div style={{ whiteSpace: msg.role === 'user' ? 'pre-wrap' : 'normal', lineHeight: 1.5 }}>
+                {(() => {
+                  // Generic loading indicator for empty assistant message
+                  if (msg.role === 'assistant' && !msg.content.trim() && loading && i === messages.length - 1) {
+                    return (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-text-secondary)', fontStyle: 'italic' }}>
+                        <div style={{
+                          width: '12px',
+                          height: '12px',
+                          border: '2px solid var(--color-text-tertiary)',
+                          borderTopColor: 'var(--color-primary)',
+                          borderRadius: '50%',
+                          animation: 'spin 1s linear infinite'
+                        }}></div>
+                        <span>Thinking...</span>
+                      </div>
+                    );
+                  }
+
                   return (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-text-secondary)', fontStyle: 'italic' }}>
-                      <div style={{
-                        width: '12px',
-                        height: '12px',
-                        border: '2px solid var(--color-text-tertiary)',
-                        borderTopColor: 'var(--color-primary)',
-                        borderRadius: '50%',
-                        animation: 'spin 1s linear infinite'
-                      }}></div>
-                      <span>Thinking...</span>
-                    </div>
+                    <>
+                      {msg.role === 'assistant' ? (
+                        <Markdown
+                          remarkPlugins={[remarkGfm]}
+                          rehypePlugins={[rehypeRaw, rehypeSanitize]}
+                          components={{
+                            p: ({ node: _node, ...props }) => <p style={{ marginBottom: 'var(--space-sm)' }} {...props} />,
+                            ul: ({ node: _node, ...props }) => <ul style={{ marginLeft: 'var(--space-lg)', marginBottom: 'var(--space-sm)' }} {...props} />,
+                            ol: ({ node: _node, ...props }) => <ol style={{ marginLeft: 'var(--space-lg)', marginBottom: 'var(--space-sm)' }} {...props} />,
+                            code: ({ node: _node, inline, ...props }) =>
+                              inline
+                                ? <code style={{ background: 'rgba(0,0,0,0.1)', padding: '2px 4px', borderRadius: '3px', fontSize: '0.9em' }} {...props} />
+                                : <code style={{ display: 'block', background: 'rgba(0,0,0,0.05)', padding: 'var(--space-sm)', borderRadius: 'var(--radius-sm)', fontSize: '0.9em', overflowX: 'auto' }} {...props} />,
+                            h1: ({ node: _node, ...props }) => <h1 style={{ fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-bold)', marginBottom: 'var(--space-sm)' }} {...props} />,
+                            h2: ({ node: _node, ...props }) => <h2 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--space-sm)' }} {...props} />,
+                            h3: ({ node: _node, ...props }) => <h3 style={{ fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--space-xs)' }} {...props} />,
+                            table: ({ node: _node, ...props }) => <table style={{ borderCollapse: 'collapse', width: '100%', marginBottom: 'var(--space-md)', fontSize: 'var(--font-size-sm)' }} {...props} />,
+                            thead: ({ node: _node, ...props }) => <thead style={{ background: 'var(--color-bg-hover)' }} {...props} />,
+                            tbody: ({ node: _node, ...props }) => <tbody {...props} />,
+                            tr: ({ node: _node, ...props }) => <tr style={{ borderBottom: '1px solid var(--color-border-light)' }} {...props} />,
+                            th: ({ node: _node, ...props }) => <th style={{ padding: 'var(--space-sm)', textAlign: 'left', fontWeight: '600', border: '1px solid var(--color-border-light)' }} {...props} />,
+                            td: ({ node: _node, ...props }) => <td style={{ padding: 'var(--space-sm)', border: '1px solid var(--color-border-light)' }} {...props} />,
+                          }}
+                        >
+                          {msg.content}
+                        </Markdown>
+                      ) : (
+                        msg.content
+                      )}
+                    </>
                   );
-                }
+                })()}
+              </div>
 
-                return (
-                  <>
-                    {msg.role === 'assistant' ? (
-                      <Markdown
-                        remarkPlugins={[remarkGfm]}
-                        rehypePlugins={[rehypeRaw]}
-                        components={{
-                          p: ({ node, ...props }) => <p style={{ marginBottom: 'var(--space-sm)' }} {...props} />,
-                          ul: ({ node, ...props }) => <ul style={{ marginLeft: 'var(--space-lg)', marginBottom: 'var(--space-sm)' }} {...props} />,
-                          ol: ({ node, ...props }) => <ol style={{ marginLeft: 'var(--space-lg)', marginBottom: 'var(--space-sm)' }} {...props} />,
-                          code: ({ node, inline, ...props }) =>
-                            inline
-                              ? <code style={{ background: 'rgba(0,0,0,0.1)', padding: '2px 4px', borderRadius: '3px', fontSize: '0.9em' }} {...props} />
-                              : <code style={{ display: 'block', background: 'rgba(0,0,0,0.05)', padding: 'var(--space-sm)', borderRadius: 'var(--radius-sm)', fontSize: '0.9em', overflowX: 'auto' }} {...props} />,
-                          h1: ({ node, ...props }) => <h1 style={{ fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-bold)', marginBottom: 'var(--space-sm)' }} {...props} />,
-                          h2: ({ node, ...props }) => <h2 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--space-sm)' }} {...props} />,
-                          h3: ({ node, ...props }) => <h3 style={{ fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--space-xs)' }} {...props} />,
-                          table: ({ node, ...props }) => <table style={{ borderCollapse: 'collapse', width: '100%', marginBottom: 'var(--space-md)', fontSize: 'var(--font-size-sm)' }} {...props} />,
-                          thead: ({ node, ...props }) => <thead style={{ background: 'var(--color-bg-hover)' }} {...props} />,
-                          tbody: ({ node, ...props }) => <tbody {...props} />,
-                          tr: ({ node, ...props }) => <tr style={{ borderBottom: '1px solid var(--color-border-light)' }} {...props} />,
-                          th: ({ node, ...props }) => <th style={{ padding: 'var(--space-sm)', textAlign: 'left', fontWeight: '600', border: '1px solid var(--color-border-light)' }} {...props} />,
-                          td: ({ node, ...props }) => <td style={{ padding: 'var(--space-sm)', border: '1px solid var(--color-border-light)' }} {...props} />,
+              {/* Sources Display */}
+              {msg.sources && msg.sources.length > 0 && (
+                <div style={{ marginTop: 'var(--space-md)', paddingTop: 'var(--space-sm)', borderTop: '1px solid var(--color-border-light)' }}>
+                  <div style={{ fontSize: 'var(--font-size-xs)', fontWeight: '600', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-xs)' }}>
+                    Sources:
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-xs)' }}>
+                    {msg.sources.map((source, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => handleViewSource(source.source, source.text, source.id)}
+                        style={{
+                          fontSize: 'var(--font-size-xs)',
+                          padding: '2px 8px',
+                          background: 'var(--color-bg-surface)',
+                          border: '1px solid var(--color-border-medium)',
+                          borderRadius: 'var(--radius-full)',
+                          color: 'var(--color-text-primary)',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          transition: 'all 0.2s'
                         }}
+                        onMouseEnter={(e) => e.currentTarget.style.borderColor = 'var(--color-primary)'}
+                        onMouseLeave={(e) => e.currentTarget.style.borderColor = 'var(--color-border-medium)'}
                       >
-                        {msg.content}
-                      </Markdown>
-                    ) : (
-                      msg.content
-                    )}
-                  </>
-                );
-              })()}
-
-
+                        <span style={{ maxWidth: '150px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {source.source}
+                        </span>
+                        <span style={{ opacity: 0.6 }}>
+                          ({Math.round(source.score * 100)}%)
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* Sources Display */}
-            {msg.sources && msg.sources.length > 0 && (
-              <div style={{ marginTop: 'var(--space-md)', paddingTop: 'var(--space-sm)', borderTop: '1px solid var(--color-border-light)' }}>
-                <div style={{ fontSize: 'var(--font-size-xs)', fontWeight: '600', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-xs)' }}>
-                  Sources:
-                </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-xs)' }}>
-                  {msg.sources.map((source, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => handleViewSource(source.source, source.text, source.id)}
-                      style={{
-                        fontSize: 'var(--font-size-xs)',
-                        padding: '2px 8px',
-                        background: 'var(--color-bg-surface)',
-                        border: '1px solid var(--color-border-medium)',
-                        borderRadius: 'var(--radius-full)',
-                        color: 'var(--color-text-primary)',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        transition: 'all 0.2s'
-                      }}
-                      onMouseEnter={(e) => e.currentTarget.style.borderColor = 'var(--color-primary)'}
-                      onMouseLeave={(e) => e.currentTarget.style.borderColor = 'var(--color-border-medium)'}
-                    >
-                      <span style={{ maxWidth: '150px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {source.source}
-                      </span>
-                      <span style={{ opacity: 0.6 }}>
-                        ({Math.round(source.score * 100)}%)
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </div>
+            {/* Export Button - Right side for Assistant bubble */}
+            {msg.role === 'assistant' && !loading && msg.content && msg.role !== 'system' && (
+              <button
+                className="btn btn-ghost btn-sm"
+                style={{
+                  width: '24px',
+                  height: '24px',
+                  padding: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: '50%',
+                  background: 'rgba(255,255,255,0.4)',
+                  backdropFilter: 'blur(8px)',
+                  border: '1px solid rgba(255,255,255,0.4)',
+                  color: 'var(--color-primary)',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
+                  transition: 'all 0.2s',
+                  flexShrink: 0
+                }}
+                onClick={() => handleExportMessage(msg)}
+                title="Export this message to Excel cell"
+              >
+                <svg style={{ width: '12px', height: '12px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+              </button>
             )}
           </div>
         ))}
@@ -2423,11 +2653,12 @@ const ChatView = ({ settings, handleViewSource, activeDocs = [], onProcessingCha
         <div ref={messagesEndRef} />
       </div >
 
-      {/* Input Area */}
-      < div style={{
+      <div className="glass-panel-bottom" style={{
+        position: 'sticky',
+        bottom: 0,
+        flexShrink: 0,
         padding: 'var(--space-lg)',
-        background: 'var(--color-bg-surface)',
-        borderTop: '1px solid var(--color-border-light)'
+        zIndex: 60
       }}>
         {chatAttachedData && (
           <div style={{
@@ -2466,20 +2697,19 @@ const ChatView = ({ settings, handleViewSource, activeDocs = [], onProcessingCha
             </button>
           </div>
         )}
-        <div style={{ display: 'flex', gap: 'var(--space-sm)' }}>
-          <button
-            className="btn btn-secondary"
-            onClick={handleAddSelection}
-            title="Attach selected table data"
-            style={{ padding: 'var(--space-md)' }}
-          >
-            <svg style={{ width: '20px', height: '20px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path>
-            </svg>
-          </button>
-          <input
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
+          {/* Top Row: Multi-line Input */}
+          <textarea
             className="input"
-            style={{ flex: 1 }}
+            style={{
+              width: '100%',
+              minHeight: '60px',
+              maxHeight: '150px',
+              padding: 'var(--space-md)',
+              lineHeight: '1.5',
+              resize: 'none',
+              overflowY: 'auto'
+            }}
             placeholder={chatUseRag ? "Ask a question about your documents..." : "Type a message..."}
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -2491,83 +2721,151 @@ const ChatView = ({ settings, handleViewSource, activeDocs = [], onProcessingCha
             }}
             disabled={loading}
           />
-          <button
-            className="btn btn-primary"
-            onClick={loading ? handleStop : handleSend}
-            disabled={!loading && !input.trim()}
-            style={loading ? { backgroundColor: 'var(--color-error)', borderColor: 'var(--color-error)' } : {}}
-          >
-            {loading ? (
-              <>
-                <svg style={{ width: '16px', height: '16px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <rect x="6" y="6" width="12" height="12" rx="2" ry="2"></rect>
-                </svg>
-                Stop
-              </>
-            ) : (
-              <>
-                <svg style={{ width: '16px', height: '16px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
-                </svg>
-                Send
-              </>
-            )}
-          </button>
+
+          {/* Bottom Row: Actions & Send */}
+          <div style={{ display: 'flex', gap: 'var(--space-sm)', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 'var(--space-sm)', alignItems: 'center' }}>
+              <label className="checkbox" style={{
+                margin: 0,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'var(--space-xs)',
+                cursor: 'pointer',
+                padding: '0 var(--space-md)',
+                height: '34px',
+                background: 'rgba(255,255,255,0.3)',
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--color-border-light)'
+              }}>
+                <input
+                  type="checkbox"
+                  checked={chatUseRag}
+                  onChange={(e) => setChatUseRag(e.target.checked)}
+                  id="chat-use-kb-bottom"
+                  style={{ width: '14px', height: '14px', cursor: 'pointer' }}
+                />
+                <span style={{ fontSize: '11px', fontWeight: 'bold', textTransform: 'uppercase', color: 'var(--color-secondary)' }}>Docs</span>
+              </label>
+
+              <div style={{ width: '1px', height: '20px', background: 'var(--color-border-light)', margin: '0 4px' }} />
+
+              <div style={{ display: 'flex', gap: 'var(--space-xs)', alignItems: 'center' }}>
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={handleAddSelection}
+                  title="Attach selected table data"
+                  style={{ width: '34px', height: '34px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <svg style={{ width: '16px', height: '16px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path>
+                  </svg>
+                </button>
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={handleExportToExcel}
+                  disabled={messages.length === 0}
+                  title="Export full chat to Excel"
+                  style={{ width: '34px', height: '34px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <svg style={{ width: '16px', height: '16px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                  </svg>
+                </button>
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={handleClearChat}
+                  disabled={messages.length === 0}
+                  title="Clear chat history"
+                  style={{ width: '34px', height: '34px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  onMouseEnter={(e) => messages.length > 0 && (e.currentTarget.style.color = 'var(--color-error)')}
+                  onMouseLeave={(e) => messages.length > 0 && (e.currentTarget.style.color = 'inherit')}
+                >
+                  <svg style={{ width: '16px', height: '16px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <button
+              className="btn btn-primary"
+              onClick={loading ? handleStop : handleSend}
+              disabled={!loading && !input.trim()}
+              style={{
+                height: '34px',
+                padding: '0 var(--space-lg)',
+                minWidth: '100px',
+                ...(loading ? { backgroundColor: 'var(--color-error)', borderColor: 'var(--color-error)' } : {})
+              }}
+            >
+              {loading ? (
+                <>
+                  <svg style={{ width: '16px', height: '16px', marginRight: '8px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <rect x="6" y="6" width="12" height="12" rx="2" ry="2"></rect>
+                  </svg>
+                  Stop
+                </>
+              ) : (
+                <>
+                  <svg style={{ width: '16px', height: '16px', marginRight: '8px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+                  </svg>
+                  Send
+                </>
+              )}
+            </button>
+          </div>
         </div>
-      </div >
+      </div>
 
       {/* Clear Chat Confirmation Modal */}
-      {
-        showClearConfirm && (
-          <div style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000
-          }}>
-            <div className="card" style={{ maxWidth: '400px', padding: 'var(--space-xl)' }}>
-              <h3 className="heading-3" style={{ marginBottom: 'var(--space-md)' }}>Clear Chat History?</h3>
-              <p style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--space-lg)' }}>
-                Are you sure you want to clear all messages? This action cannot be undone.
-              </p>
-              <div style={{ display: 'flex', gap: 'var(--space-sm)', justifyContent: 'flex-end' }}>
-                <button className="btn btn-ghost" onClick={() => setShowClearConfirm(false)}>Cancel</button>
-                <button className="btn btn-danger" onClick={confirmClear}>Clear Chat</button>
-              </div>
+      {showClearConfirm && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div className="card" style={{ maxWidth: '400px', padding: 'var(--space-xl)' }}>
+            <h3 className="heading-3" style={{ marginBottom: 'var(--space-md)' }}>Clear Chat History?</h3>
+            <p style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--space-lg)' }}>
+              Are you sure you want to clear all messages? This action cannot be undone.
+            </p>
+            <div style={{ display: 'flex', gap: 'var(--space-sm)', justifyContent: 'flex-end' }}>
+              <button className="btn btn-ghost" onClick={() => setShowClearConfirm(false)}>Cancel</button>
+              <button className="btn btn-danger" onClick={confirmClear}>Clear Chat</button>
             </div>
           </div>
-        )
-      }
+        </div>
+      )}
 
       {/* Overwrite Confirmation Modal */}
-      {
-        showOverwriteConfirm && (
-          <div style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000
-          }}>
-            <div className="card" style={{ maxWidth: '400px', padding: 'var(--space-xl)' }}>
-              <h3 className="heading-3" style={{ marginBottom: 'var(--space-md)' }}>Overwrite Cell?</h3>
-              <p style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--space-lg)' }}>
-                The selected cell contains data. Do you want to overwrite it with the chat export?
-              </p>
-              <div style={{ display: 'flex', gap: 'var(--space-sm)', justifyContent: 'flex-end' }}>
-                <button className="btn btn-ghost" onClick={cancelOverwrite}>Cancel</button>
-                <button className="btn btn-primary" onClick={confirmOverwrite}>Overwrite</button>
-              </div>
+      {showOverwriteConfirm && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div className="card" style={{ maxWidth: '400px', padding: 'var(--space-xl)' }}>
+            <h3 className="heading-3" style={{ marginBottom: 'var(--space-md)' }}>Overwrite Cell?</h3>
+            <p style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--space-lg)' }}>
+              The selected cell contains data. Do you want to overwrite it with this export?
+            </p>
+            <div style={{ display: 'flex', gap: 'var(--space-sm)', justifyContent: 'flex-end' }}>
+              <button className="btn btn-ghost" onClick={cancelOverwrite}>Cancel</button>
+              <button className="btn btn-primary" onClick={confirmOverwrite}>Overwrite</button>
             </div>
           </div>
-        )
-      }
-    </div >
+        </div>
+      )}
+    </div>
   );
 };
 
@@ -2744,7 +3042,7 @@ const KnowledgeView = ({ documents, refreshDocs, excludedDocs = [], setExcludedD
         let sheet;
         try {
           sheet = context.workbook.worksheets.add(sheetName);
-        } catch (e) {
+        } catch {
           sheet = context.workbook.worksheets.add(`${sheetName} ${Date.now().toString().slice(-4)}`);
         }
 
@@ -2781,7 +3079,8 @@ const KnowledgeView = ({ documents, refreshDocs, excludedDocs = [], setExcludedD
   };
 
   return (
-    <div style={{ height: '100%', overflow: 'auto', padding: 'var(--space-xs)', background: 'var(--color-bg-base)' }}>
+    <div style={{ height: '100%', overflowY: 'auto', padding: '44px var(--space-xs) var(--space-xs)', background: 'transparent' }}>
+      <div style={{ height: '1px', background: 'rgba(255, 255, 255, 0.6)', position: 'fixed', top: '44px', left: 0, right: 0, zIndex: 1001, boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }} />
       <div className="container" style={{ maxWidth: '100%' }}>
 
         {/* Header */}
@@ -2973,7 +3272,8 @@ const KnowledgeView = ({ documents, refreshDocs, excludedDocs = [], setExcludedD
 };
 
 const AuditView = () => {
-  const [selectedText, setSelectedText] = useState('');
+  // const [selectedText, setSelectedText] = useState('');
+  const [, setSelectedText] = useState('');
   const [sources, setSources] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -3011,7 +3311,7 @@ const AuditView = () => {
                   const chunk = await res.json();
                   fetchedSources.push({ ...chunk, score: item.score });
                 }
-              } catch (e) {
+              } catch {
                 console.error("Failed to fetch chunk", item.id);
               }
             }
@@ -3075,37 +3375,32 @@ const AuditView = () => {
   const activeContent = activeChunk ? documentCache[activeChunk.source] : null;
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--color-bg-base)' }}>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'transparent', overflowY: 'auto', position: 'relative' }}>
+      {/* Spacer for the absolute app header */}
+      <div style={{ height: '44px', flexShrink: 0 }} />
 
-      {/* Header & Navigation */}
-      <div style={{
-        background: 'var(--color-bg-surface)',
-        borderBottom: '1px solid var(--color-border-light)',
+      {/* Audit Header - Sticky below app header */}
+      <div className="glass-panel glass-panel-top" style={{
+        position: 'sticky',
+        top: '44px',
+        padding: '0',
+        border: 'none',
+        borderBottom: '1px solid rgba(255, 255, 255, 0.4)',
         boxShadow: 'var(--shadow-sm)',
         flexShrink: 0,
-        zIndex: 10
+        zIndex: 60
       }}>
-        <div style={{ padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-          <h2 className="heading-2" style={{ margin: 0 }}>Audit View</h2>
-          {sources.length > 0 && (
-            <span className="badge badge-neutral">
-              {sources.length} Citation{sources.length !== 1 ? 's' : ''}
-            </span>
-          )}
-        </div>
-
-        {/* Source Navigation Bar */}
         {sources.length > 0 && (
           <div style={{
-            padding: '16px',
-            background: 'var(--color-bg-base)',
-            borderTop: '1px solid var(--color-border-light)',
             display: 'flex',
-            gap: '12px',
+            alignItems: 'center',
+            gap: 'var(--space-md)',
             overflowX: 'auto',
             overflowY: 'hidden',
-            WebkitOverflowScrolling: 'touch'
+            WebkitOverflowScrolling: 'touch',
+            padding: 'var(--space-sm)'
           }}>
+            {/* Minimal Source Chips */}
             {sources.map((source, i) => {
               const isActive = activeChunk && activeChunk.id === source.id;
               return (
@@ -3115,42 +3410,52 @@ const AuditView = () => {
                   className="card"
                   style={{
                     minWidth: '160px',
-                    maxWidth: '200px',
+                    maxWidth: '220px',
                     flexShrink: 0,
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'flex-start',
-                    padding: 'var(--space-md)',
+                    padding: 'var(--space-xs) var(--space-sm)',
+                    gap: '2px',
                     cursor: 'pointer',
-                    border: isActive ? '2px solid var(--color-primary)' : '1px solid var(--color-border-light)',
-                    background: isActive ? 'var(--color-primary)' : 'var(--color-bg-surface)',
+                    border: isActive ? '1px solid var(--color-primary)' : '1px solid rgba(255,255,255,0.3)',
+                    background: isActive ? 'var(--color-primary)' : 'rgba(255,255,255,0.4)',
+                    backdropFilter: isActive ? 'none' : 'blur(8px)',
+                    borderRadius: 'var(--radius-md)',
                     transition: 'all var(--transition-fast)'
                   }}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', marginBottom: 'var(--space-xs)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
                     <span style={{
-                      fontSize: 'var(--font-size-sm)',
+                      fontSize: '10px',
                       fontWeight: 'var(--font-weight-bold)',
-                      color: isActive ? 'white' : 'var(--color-text-primary)'
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                      color: isActive ? 'rgba(255,255,255,0.9)' : 'var(--color-text-secondary)'
                     }}>
                       Source {i + 1}
                     </span>
-                    <span className={isActive ? 'badge' : 'badge badge-success'} style={{
-                      fontSize: 'var(--font-size-xs)',
-                      background: isActive ? 'rgba(255,255,255,0.2)' : undefined,
-                      color: isActive ? 'white' : undefined,
-                      border: isActive ? 'none' : undefined
+                    <span style={{
+                      fontSize: '10px',
+                      fontWeight: 'var(--font-weight-bold)',
+                      background: isActive ? 'rgba(255,255,255,0.2)' : 'var(--color-bg-base)',
+                      color: isActive ? 'white' : 'var(--color-primary)',
+                      padding: '1px 4px',
+                      borderRadius: '4px',
+                      flexShrink: 0
                     }}>
                       {source.score}%
                     </span>
                   </div>
                   <span style={{
-                    fontSize: 'var(--font-size-xs)',
-                    width: '100%',
+                    fontSize: '11px',
+                    fontWeight: 'var(--font-weight-medium)',
+                    color: isActive ? 'white' : 'var(--color-text-primary)',
                     whiteSpace: 'nowrap',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
-                    color: isActive ? 'rgba(255,255,255,0.8)' : 'var(--color-text-secondary)'
+                    width: '100%',
+                    textAlign: 'left'
                   }} title={source.source}>
                     {source.source}
                   </span>
@@ -3222,7 +3527,7 @@ const AuditView = () => {
             </code>
           </div>
         ) : (
-          <div style={{ height: '100%', padding: 'var(--space-lg)' }}>
+          <div style={{ height: '100%', padding: 'var(--space-sm)' }}>
             {loadingContent && !activeContent ? (
               <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <div style={{
@@ -3246,7 +3551,7 @@ const AuditView = () => {
           </div>
         )}
       </div>
-    </div>
+    </div >
   );
 };
 
@@ -3366,7 +3671,8 @@ const SettingsView = ({
   };
 
   return (
-    <div style={{ height: '100%', overflow: 'auto', padding: 'var(--space-xs)', background: 'var(--color-bg-base)' }}>
+    <div style={{ height: '100%', overflowY: 'auto', padding: '44px var(--space-xs) var(--space-xs)', background: 'transparent' }}>
+      <div style={{ height: '1px', background: 'rgba(255, 255, 255, 0.6)', position: 'fixed', top: '44px', left: 0, right: 0, zIndex: 1001, boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }} />
       <div className="container" style={{ maxWidth: '100%' }}>
 
         {/* Header */}

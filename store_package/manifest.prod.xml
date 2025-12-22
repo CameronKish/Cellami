@@ -11,12 +11,13 @@
   <ProviderName>Cellami</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="Cellami" />
-  <Description DefaultValue="Local AI for Excel." />
-  <IconUrl DefaultValue="http://localhost:8000/icons/icon-32.png" />
-  <HighResolutionIconUrl DefaultValue="http://localhost:8000/icons/icon-64.png" />
-  <SupportUrl DefaultValue="https://www.example.com" />
+  <Description DefaultValue="Local AI for Excel" />
+  <IconUrl DefaultValue="https://cellami.vercel.app/assets/icon-32.png" />
+  <HighResolutionIconUrl DefaultValue="https://cellami.vercel.app/assets/icon-64.png" />
+  <SupportUrl DefaultValue="https://cellami.vercel.app/support" />
   <AppDomains>
-    <AppDomain>http://localhost:8000</AppDomain>
+    <AppDomain>https://cellami.vercel.app</AppDomain>
+    <!-- Add your Vercel/Netlify domain here if different from above -->
   </AppDomains>
 
   <Hosts>
@@ -24,7 +25,7 @@
   </Hosts>
 
   <DefaultSettings>
-    <SourceLocation DefaultValue="http://localhost:8000/index.html" />
+    <SourceLocation DefaultValue="https://cellami.vercel.app/index.html" />
   </DefaultSettings>
 
   <Permissions>ReadWriteDocument</Permissions>
@@ -73,14 +74,14 @@
     </Hosts>
     <Resources>
       <bt:Images>
-        <bt:Image id="Icon.16x16" DefaultValue="http://localhost:8000/icons/icon-16.png" />
-        <bt:Image id="Icon.32x32" DefaultValue="http://localhost:8000/icons/icon-32.png" />
-        <bt:Image id="Icon.80x80" DefaultValue="http://localhost:8000/icons/icon-80.png" />
+        <bt:Image id="Icon.16x16" DefaultValue="https://cellami.vercel.app/assets/icon-16.png" />
+        <bt:Image id="Icon.32x32" DefaultValue="https://cellami.vercel.app/assets/icon-32.png" />
+        <bt:Image id="Icon.80x80" DefaultValue="https://cellami.vercel.app/assets/icon-80.png" />
       </bt:Images>
       <bt:Urls>
-        <bt:Url id="GetStarted.LearnMoreUrl" DefaultValue="https://go.microsoft.com/fwlink/?LinkId=276812" />
+        <bt:Url id="GetStarted.LearnMoreUrl" DefaultValue="https://cellami.vercel.app/download" />
 
-        <bt:Url id="Taskpane.Url" DefaultValue="http://localhost:8000/index.html" />
+        <bt:Url id="Taskpane.Url" DefaultValue="https://cellami.vercel.app/index.html" />
       </bt:Urls>
       <bt:ShortStrings>
         <bt:String id="GetStarted.Title" DefaultValue="Get started with Cellami!" />

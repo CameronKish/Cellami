@@ -10,6 +10,7 @@ venv/
 node_modules/
 frontend/node_modules/
 frontend/dist/
+frontend/dev-dist/
 .DS_Store
 
 # IDEs
@@ -27,3 +28,11 @@ dist/
 
 # Logs
 *.log
+
+# Testing
+.pytest_cache/
+
+# OS / Installers
+*.dmg
+*.pkg
+.DS_Store

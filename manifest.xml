@@ -7,16 +7,16 @@
   xsi:type="TaskPaneApp">
 
   <Id>c3940250-37f3-444c-8032-39ed3e997b28</Id>
-  <Version>1.1.0.0</Version>
+  <Version>1.2.0.0</Version>
   <ProviderName>Cellami</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="Cellami" />
   <Description DefaultValue="Local AI for Excel using Ollama" />
-  <IconUrl DefaultValue="https://localhost:3000/assets/icon-32.png" />
-  <HighResolutionIconUrl DefaultValue="https://localhost:3000/assets/icon-64.png" />
+  <IconUrl DefaultValue="http://localhost:3000/assets/icon-64.png" />
+  <HighResolutionIconUrl DefaultValue="http://localhost:3000/assets/icon-128.png" />
   <SupportUrl DefaultValue="https://www.example.com" />
   <AppDomains>
-    <AppDomain>https://localhost:3000</AppDomain>
+    <AppDomain>http://localhost:3000</AppDomain>
   </AppDomains>
 
   <Hosts>
@@ -24,7 +24,7 @@
   </Hosts>
 
   <DefaultSettings>
-    <SourceLocation DefaultValue="https://localhost:3000/index.html" />
+    <SourceLocation DefaultValue="http://localhost:3000/index.html" />
   </DefaultSettings>
 
   <Permissions>ReadWriteDocument</Permissions>
@@ -86,7 +86,7 @@
         <bt:String id="GetStarted.Title" DefaultValue="Get started with Cellami!" />
         <bt:String id="TabLabel" DefaultValue="Cellami" />
         <bt:String id="GroupLabel" DefaultValue="AI Tools" />
-        <bt:String id="TaskpaneButton.Label" DefaultValue="Open Cellami" />
+        <bt:String id="TaskpaneButton.Label" DefaultValue="Cellami" />
       </bt:ShortStrings>
       <bt:LongStrings>
         <bt:String id="GetStarted.Description" DefaultValue="Your local AI assistant for Excel." />

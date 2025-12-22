@@ -62,4 +62,6 @@ if %errorlevel% neq 0 (
 )
 
 echo ✅ Build Complete!
+copy manifest.prod.xml dist\
+echo 📄 Copied manifest.prod.xml to dist\
 echo 🎉 Your app is ready at: dist\Cellami.exe

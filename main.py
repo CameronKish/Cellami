@@ -39,6 +39,25 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+class EndpointFilter(logging.Filter):
+    """
+    Filter out heartbeat requests from access logs to avoid clutter.
+    """
+    def filter(self, record: logging.LogRecord) -> bool:
+        try:
+            msg = record.getMessage()
+            # Filter out 200 OK responses for health checks
+            if "GET /api/settings" in msg and "200" in msg:
+                return False
+            # Filter out 401 Unauthorized triggers (auto-heal wake-up call)
+            if "GET /api/settings" in msg and "401" in msg:
+                return False
+            if "GET /api/auth/token" in msg and "200" in msg:
+                return False
+            return True
+        except Exception:
+            return True
+
 # Global signals to abort active chat streams
 abort_signals = {}
 
@@ -56,25 +75,54 @@ os.makedirs(USER_DATA_DIR, exist_ok=True)
 SETTINGS_FILE = os.path.join(USER_DATA_DIR, "settings.json")
 KB_FILE = os.path.join(USER_DATA_DIR, "knowledge_base.json")
 MD_STORAGE_DIR = os.path.join(USER_DATA_DIR, "markdown_storage")
+MODEL_CACHE_DIR = os.path.join(USER_DATA_DIR, "models_cache")
+MAX_UPLOAD_SIZE = 10 * 1024 * 1024 # 10MB
+
+# Ensure directories exist
 os.makedirs(MD_STORAGE_DIR, exist_ok=True)
+os.makedirs(MODEL_CACHE_DIR, exist_ok=True)
 
 OLLAMA_BASE_URL = "http://localhost:11434/api"
 
 app = FastAPI()
 
+# Global embedding model (Persistent)
+_embedding_model = None
+
+def preload_model():
+    """Download model in background if missing, then unload to save RAM."""
+    try:
+        logger.info("Background: Checking/Downloading embedding model...")
+        from fastembed import TextEmbedding # Lazy import
+        
+        # Instantiate to trigger download (uses cache if available)
+        # We do NOT assign to the global _embedding_model here, so it verifies files exist
+        # and then frees the memory immediately when this function ends.
+        temp_model = TextEmbedding(
+            model_name="nomic-ai/nomic-embed-text-v1.5",
+            cache_dir=MODEL_CACHE_DIR
+        )
+        del temp_model
+        logger.info("Background: Model verified/downloaded. Memory cleared.")
+    except Exception as e:
+        logger.error(f"Background: Model preload failed (likely offline): {e}")
+
+@app.on_event("startup")
+async def startup_event():
+    # Run in a separate thread so startup is instant
+    # This ensures the model is ready by the time the user actually needs it
+    asyncio.create_task(asyncio.to_thread(preload_model))
+
 
 
 # --- AUTHENTICATION ---
-# (Moved to top of file after logger init)
-
-
-
 
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
     # Allow public endpoints and non-api routes (like static files)
     # Also alow OPTIONS requests for CORS preflight
     if request.method == "OPTIONS":
+        logger.info(f"OPTIONS Request from Origin: {request.headers.get('origin')} | Headers: {request.headers}")
         return await call_next(request)
         
     if request.url.path in ["/", "/docs", "/openapi.json", "/api/auth/token"] or not request.url.path.startswith("/api"):
@@ -83,13 +131,12 @@ async def auth_middleware(request: Request, call_next):
     # Check Token
     token = request.headers.get("X-API-Token")
     if token != SESSION_TOKEN:
-         logger.warning(f"Unauthorized access attempt to {request.url.path}")
          return Response(content="Unauthorized", status_code=401)
          
     return await call_next(request)
 
 
-# Enable CORS for Office Add-in
+# Enable CORS for Office Add-in and Production Frontend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -98,20 +145,43 @@ app.add_middleware(
         "http://localhost:3000",  # Common React/Add-in port
         "https://localhost:3000", # Common HTTPS port
         "https://localhost:5173", # Vite HTTPS
+        "https://app.cellami.ai", # Production Domain
+        "http://localhost:8000",  # Python Backend
+        "http://127.0.0.1:8000",  # Python Backend IP
+        "https://cellami.vercel.app", # Vercel Deployment
     ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-Sources"],
 )
 
+# ... (Keeping the CORS config as is)
+
 # Middleware to prevent caching of index.html
+
+@app.get("/api/list-models")
+def list_models():
+    try:
+        response = requests.get(f"{OLLAMA_BASE_URL}/tags", timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            models = [model["name"] for model in data.get("models", [])]
+            return {"models": models}
+        else:
+            return {"models": []}
+    except Exception as e:
+        logger.error(f"Failed to list models: {e}")
+        return {"models": []}
 @app.middleware("http")
-async def add_no_cache_header(request, call_next):
+async def add_security_headers(request, call_next):
     response = await call_next(request)
-    if request.url.path in ["/", "/index.html"]:
-        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-        response.headers["Pragma"] = "no-cache"
-        response.headers["Expires"] = "0"
+    # Aggressive cache busting
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    # Allow Vercel (https) to talk to Localhost (http)
+    response.headers["Access-Control-Allow-Private-Network"] = "true"
     return response
 
 # Store background tasks
@@ -192,15 +262,15 @@ def get_next_chunk_id(kb_data: List[Dict]) -> int:
 
 # --- OLLAMA API WRAPPERS ---
 
-# Global embedding model
-_embedding_model = None
-
 def get_embedding_model():
     global _embedding_model
     if _embedding_model is None:
         from fastembed import TextEmbedding # Lazy import to speed up startup
-        logger.info("Loading embedding model (nomic-ai/nomic-embed-text-v1.5)...")
-        _embedding_model = TextEmbedding(model_name="nomic-ai/nomic-embed-text-v1.5")
+        logger.info(f"Loading embedding model (nomic-ai/nomic-embed-text-v1.5) from {MODEL_CACHE_DIR}...")
+        _embedding_model = TextEmbedding(
+            model_name="nomic-ai/nomic-embed-text-v1.5",
+            cache_dir=MODEL_CACHE_DIR
+        )
         logger.info("Embedding model loaded.")
     return _embedding_model
 
@@ -385,7 +455,6 @@ def find_relevant_context(query: str, top_k: int = 3, doc_filters: List[str] = N
     if not kb_data:
         return {"context": "", "tag": ""}
         
-    # embedding_model = get_config_value("embedding_model_name", "nomic-embed-text:v1.5")
     query_vector = get_local_embedding(query)
     
     if not query_vector:
@@ -431,23 +500,10 @@ def clean_text(text: str) -> str:
 def get_settings():
     return load_settings()
 
-@app.get("/api/list-models")
-def list_models():
-    try:
-        response = requests.get(f"{OLLAMA_BASE_URL}/tags", timeout=5)
-        if response.status_code == 200:
-            data = response.json()
-            models = [model["name"] for model in data.get("models", [])]
-            return {"models": models}
-        else:
-            return {"models": []}
-    except Exception as e:
-        logger.error(f"Failed to list models: {e}")
-        return {"models": []}
 
 @app.post("/api/settings")
 def update_settings(settings: Settings):
-    save_settings(settings.dict())
+    save_settings(settings.model_dump())
     return {"status": "success"}
 
 
@@ -511,7 +567,7 @@ async def chat(request: ChatRequest):
     temp = request.temperature if request.temperature is not None else config.get("temperature", 0.7)
     
     # Convert Pydantic models to dicts for the wrapper
-    messages_dicts = [m.dict(exclude_none=True) for m in request.messages]
+    messages_dicts = [m.model_dump(exclude_none=True) for m in request.messages]
     
     # Inject Context Data (Table Selection) if present
     # Iterate through all messages to merge context_data into content
@@ -585,7 +641,8 @@ async def chat(request: ChatRequest):
                 logger.info(f"RAG Query Expansion: (length: {len(last_user_msg['content'])}) -> '{generated_query}'")
                 
                 # 3. Execute Search with Generated Query
-                rag_result = find_relevant_context(generated_query, doc_filters=request.filtered_documents)
+                # Run RAG search in thread to avoid blocking the event loop (embedding generation is heavy)
+                rag_result = await asyncio.to_thread(find_relevant_context, generated_query, doc_filters=request.filtered_documents)
                 context = rag_result["context"]
                 
                 # Capture sources
@@ -1006,6 +1063,10 @@ def extract_text_from_file(file_path: str, filename: str) -> str:
             with open(file_path, "r", encoding="utf-8", errors="replace") as f:
                 return f.read()
 
+        # FIX: Set threading options JUST for this import to prevent macOS crash
+        # This avoids setting them globally as requested by the user.
+        os.environ["OMP_NUM_THREADS"] = "1"
+        os.environ["CV_IO_MAX_THREADS"] = "1"
         from docling.document_converter import DocumentConverter # Lazy import
         
         try:
@@ -1030,7 +1091,8 @@ async def process_document_task(task_id: str, temp_path: str, filename: str):
         await asyncio.sleep(0.5)  # Allow frontend to poll and see this update
         
         print(f"Task {task_id}: Extracting text from {filename}...")
-        content = extract_text_from_file(temp_path, filename)
+        # Run in a separate thread to avoid blocking the event loop!
+        content = await asyncio.to_thread(extract_text_from_file, temp_path, filename)
         
         if not content:
              raise ValueError("Could not extract text or unsupported file type")
@@ -1053,7 +1115,8 @@ async def process_document_task(task_id: str, temp_path: str, filename: str):
         await asyncio.sleep(0.5)  # Allow frontend to poll and see this update
         print(f"Task {task_id}: Chunking content...")
             
-        chunks = recursive_chunker(content)
+        # Run chunker in thread to keep heartbeat alive
+        chunks = await asyncio.to_thread(recursive_chunker, content)
         
         total_chunks = len(chunks)
         tasks[task_id]["message"] = f"Generated {total_chunks} text chunks"
@@ -1085,7 +1148,8 @@ async def process_document_task(task_id: str, temp_path: str, filename: str):
             await asyncio.sleep(0.1) 
             
             try:
-                embedding = get_local_embedding(chunk)
+                # Run embedding in thread to keep heartbeat alive
+                embedding = await asyncio.to_thread(get_local_embedding, chunk)
                 if embedding:
                     new_entries.append({
                         "id": next_id + i,
@@ -1107,7 +1171,8 @@ async def process_document_task(task_id: str, temp_path: str, filename: str):
         # Critical Section: Atomic Update of Knowledge Base
         # We re-load the KB here to get the latest state (in case other tasks finished while we were embedding)
         async with KB_LOCK:
-            current_kb_data = load_kb()
+            # Run I/O in thread to prevent blocking heartbeat
+            current_kb_data = await asyncio.to_thread(load_kb)
             # Recalculate IDs based on the *current* latest ID to avoid collisions
             start_id = get_next_chunk_id(current_kb_data)
             
@@ -1116,7 +1181,8 @@ async def process_document_task(task_id: str, temp_path: str, filename: str):
                 entry["id"] = start_id + i
                 
             current_kb_data.extend(new_entries)
-            save_kb(current_kb_data)
+            # Run I/O in thread
+            await asyncio.to_thread(save_kb, current_kb_data)
         
         tasks[task_id]["status"] = "completed"
         tasks[task_id]["progress"] = 100
@@ -1166,7 +1232,25 @@ async def add_document(background_tasks: BackgroundTasks, file: UploadFile = Fil
     # Sync KB before adding new files to ensure clean state
     sync_knowledge_base()
 
+    # Vulnerability Fix: Limit file size to prevent DoS
+    # We use file.size (spooled) or explicit seek/tell check
+    file.file.seek(0, 2)
+    file_size = file.file.tell()
+    file.file.seek(0)
+    
+    if file_size > MAX_UPLOAD_SIZE:
+        raise HTTPException(
+            status_code=413, 
+            detail=f"File too large. Maximum size is {MAX_UPLOAD_SIZE / (1024*1024)}MB."
+        )
+
     filename = sanitize_filename(file.filename)
+    
+    # Check for duplicates
+    kb_data = load_kb()
+    if any(item["source"] == filename for item in kb_data):
+        raise HTTPException(status_code=409, detail=f"Document '{filename}' already exists in the knowledge base.")
+
     task_id = str(uuid.uuid4())
     
     # Save file temporarily in system temp dir to avoid Read-only FS errors
@@ -1401,6 +1485,8 @@ def get_auth_token(request: Request):
     is_trusted_dev = (origin and origin.startswith(allowed_prefixes)) or \
                      (referer and referer.startswith(allowed_prefixes))
     
+    logger.info(f"Token requested by Origin: {origin} (Trusted: {is_trusted_dev})")
+
     if IS_DEV_MODE or is_trusted_dev:
         return {"token": SESSION_TOKEN}
     else:
@@ -1484,6 +1570,16 @@ if __name__ == "__main__":
         "level": "INFO",
         "propagate": False
     }
+
+    # Add custom filter to silence heartbeat logs
+    log_config["filters"] = {
+        "heartbeat_filter": {
+            "()": "__main__.EndpointFilter",
+        }
+    }
+    if "filters" not in log_config["loggers"]["uvicorn.access"]:
+        log_config["loggers"]["uvicorn.access"]["filters"] = []
+    log_config["loggers"]["uvicorn.access"]["filters"].append("heartbeat_filter")
 
     # Define server configuration with custom log_config
     # B104: Bind to 127.0.0.1 (localhost) only for security
