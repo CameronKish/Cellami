@@ -65,6 +65,18 @@ abort_signals = {}
 KB_LOCK = asyncio.Lock()
 
 # --- HELPER FUNCTIONS ---
+import sys
+
+def resource_path(relative_path):
+    """ Get absolute path to resource, works for dev and for PyInstaller """
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
+
 # --- CONFIGURATION ---
 # Centralize data storage to user's home directory
 # This ensures both the App Bundle and the Executable share the same data
@@ -140,7 +152,7 @@ async def auth_middleware(request: Request, call_next):
 # Enable CORS for Office Add-in and Production Frontend
 
 
-@app.middleware("http")
+# PNA Middleware Definition (added explicitly below)
 async def add_pna_header(request: Request, call_next):
     response = await call_next(request)
     origin = request.headers.get("Origin")
@@ -166,11 +178,14 @@ app.add_middleware(
     ],
     allow_credentials=True,
     allow_methods=["GET", "POST", "OPTIONS", "DELETE", "PUT"],
-    allow_headers=["Content-Type", "Authorization", "X-API-Token", "X-Requested-With"],
+    allow_headers=["*"],
     expose_headers=["X-Sources"],
 )
 
-# ... (Keeping the CORS config as is)
+# CRITICAL: Add PNA Middleware LAST so it runs FIRST (wraps CORS), allowing it to inject headers 
+# into the Response even if CORS handles the OPTIONS request.
+from starlette.middleware.base import BaseHTTPMiddleware
+app.add_middleware(BaseHTTPMiddleware, dispatch=add_pna_header)
 
 # Middleware to prevent caching of index.html
 
@@ -1602,26 +1617,132 @@ if __name__ == "__main__":
 
     # Define server configuration with custom log_config
     # B104: Bind to 127.0.0.1 (localhost) only for security
-    config = uvicorn.Config(
-        app, 
-        host="127.0.0.1", 
-        port=8000, 
-        log_level="info", 
-        log_config=log_config,
-        ssl_keyfile="key.pem",
-        ssl_certfile="cert.pem"
-    )
+    
+    # --- AUTO-SSL SETUP ---
+    import subprocess
+    import sys
+    import shutil
+    
+    def ensure_ssl_setup():
+        """
+        Checks for SSL certificates. If missing, attempts to generate them using bundled mkcert.
+        Returns a dict with paths if successful, or None if failed.
+        """
+        cert_file = os.path.join(USER_DATA_DIR, "cert.pem")
+        key_file = os.path.join(USER_DATA_DIR, "key.pem")
+        
+        if os.path.exists(cert_file) and os.path.exists(key_file):
+            logger.info("SSL: Certificates found.")
+            return {"key": key_file, "cert": cert_file}
+        
+
+
+        
+        # Platform-specific binary name
+        bin_name = "mkcert.exe" if sys.platform == "win32" else "mkcert"
+        bundled_mkcert = resource_path(bin_name) 
+        
+        # We MUST copy the binary to USER_DATA_DIR because we cannot os.chmod inside the App Bundle
+        final_mkcert_path = os.path.join(USER_DATA_DIR, bin_name)
+
+        # Check for bundled binary
+        if not os.path.exists(bundled_mkcert):
+             logger.error(f"SSL: Bundled mkcert not found at {bundled_mkcert}.")
+             return None
+             
+        try:
+            # Always copy to ensure we have the latest version and valid permissions
+            shutil.copy2(bundled_mkcert, final_mkcert_path)
+            mkcert_bin = final_mkcert_path
+            
+            # 1. Make executable (Mac/Linux only)
+            if sys.platform != "win32":
+                os.chmod(mkcert_bin, 0o755)
+            
+            # 2. Install CA (Requires Admin)
+            logger.info("SSL: Requesting Admin Privileges to install Root CA...")
+            abs_mkcert = os.path.abspath(mkcert_bin)
+
+            if sys.platform == "darwin":
+                # macOS
+                cmd = f"'{abs_mkcert}' -install"
+                applescript = f'''
+                display dialog "Cellami needs to set up a secure local connection for Excel.\\n\\nPlease enter your password in the next window to trust the local certificate." with title "Cellami Setup" buttons {{"Cancel", "OK"}} default button "OK" with icon note
+                do shell script "{cmd}" with administrator privileges
+                '''
+                
+
+                
+                result = subprocess.run(["osascript", "-e", applescript], capture_output=True, text=True)
+                
+                if result.returncode != 0:
+                     logger.error(f"SSL: CA Install Failed (User cancelled?): {result.stderr}")
+                     return None
+
+            elif sys.platform == "win32":
+                # Windows
+                import ctypes
+                
+                MB_OKCANCEL = 0x00000001
+                MB_ICONINFORMATION = 0x00000040
+                IDOK = 1
+                msg = "Cellami needs to set up a secure local connection for Excel.\n\nPlease click 'Yes' in the next window to trust the local certificate."
+                ret = ctypes.windll.user32.MessageBoxW(0, msg, "Cellami Setup", MB_OKCANCEL | MB_ICONINFORMATION)
+                
+                if ret != IDOK:
+                    return None
+                    
+                ret = ctypes.windll.shell32.ShellExecuteW(None, "runas", abs_mkcert, "-install", None, 1)
+                if ret <= 32:
+                     return None
+                
+                import time
+                time.sleep(2) 
+            
+            logger.info("SSL: Root CA Install Triggered.")
+            
+            # 3. Generate Certs (No Admin needed)
+            logger.info("SSL: Generating certificates...")
+            gen_result = subprocess.run(
+                [mkcert_bin, "-key-file", key_file, "-cert-file", cert_file, "localhost", "127.0.0.1", "::1"],
+                capture_output=True, text=True
+            )
+            
+            if gen_result.returncode != 0:
+                logger.error(f"SSL Generation Failed: {gen_result.stderr}")
+                print(f"SSL Generation Error (Stderr): {gen_result.stderr}", file=sys.stderr) # Ensure visible in Console
+                return None
+            
+            logger.info("SSL: Certificates Generated Successfully!")
+            return {"key": key_file, "cert": cert_file}
+            
+        except Exception as e:
+            logger.error(f"SSL Setup Exception: {e}")
+            print(f"SSL Setup Critical Exception: {e}", file=sys.stderr)
+            return None
+
+    ssl_paths = ensure_ssl_setup()
+    
+    # Configure Uvicorn based on SSL status
+    server_config = {
+        "app": app,
+        "host": "127.0.0.1",
+        "port": 8000,
+        "log_level": "info",
+        "log_config": log_config
+    }
+    
+    if ssl_paths:
+        logger.info("SSL: Starting in HTTPS mode.")
+        server_config["ssl_keyfile"] = ssl_paths["key"]
+        server_config["ssl_certfile"] = ssl_paths["cert"]
+    else:
+        logger.critical("SSL: Starting in HTTP mode (INSECURE). Mac connection will likely fail.")
+
+    config = uvicorn.Config(**server_config)
     server = uvicorn.Server(config)
     
-    def resource_path(relative_path):
-        """ Get absolute path to resource, works for dev and for PyInstaller """
-        try:
-            # PyInstaller creates a temp folder and stores path in _MEIPASS
-            base_path = sys._MEIPASS
-        except Exception:
-            base_path = os.path.abspath(".")
 
-        return os.path.join(base_path, relative_path)
 
     def run_server():
         server.run()

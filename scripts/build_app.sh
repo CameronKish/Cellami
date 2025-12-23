@@ -57,7 +57,9 @@ fi
     --clean \
     --onedir \
     --windowed \
+    --windowed \
     --icon "assets/Cellami.icns" \
+    --add-binary "mkcert:." \
     --collect-all docling \
     --collect-all docling_core \
     --collect-all docling_parse \

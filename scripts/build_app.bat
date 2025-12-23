@@ -41,6 +41,7 @@ if exist "%ICON_SOURCE%" (
     --noconsole ^
     --splash "assets\Cellami_Desktop.png" ^
     %ICON_FLAG% ^
+    --add-binary "mkcert.exe;." ^
     --collect-all docling ^
     --collect-all docling_core ^
     --collect-all docling_parse ^

@@ -26,8 +26,15 @@ build/
 dist/
 *.spec
 
+# SSL / Binaries
+mkcert
+mkcert.exe
+*.pem
+*.key
+
 # Logs
 *.log
+TRACE.txt
 
 # Testing
 .pytest_cache/

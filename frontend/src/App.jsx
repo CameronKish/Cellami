@@ -123,7 +123,7 @@ const App = () => {
   const [showInspectButton, setShowInspectButton] = useState(false);
   const [developerMode, setDeveloperMode] = useState(false);
 
-  const fetchSettings = async () => {
+  const fetchSettings = useCallback(async () => {
     try {
       const res = await fetchAPI(`${API_BASE}/settings`);
       if (res.ok) {
@@ -133,9 +133,9 @@ const App = () => {
     } catch (e) {
       console.error("Failed to fetch settings", e);
     }
-  };
+  }, []);
 
-  const refreshDocs = async () => {
+  const refreshDocs = useCallback(async () => {
     try {
       const res = await fetchAPI(`${API_BASE}/list-documents`);
       if (res.ok) {
@@ -145,7 +145,7 @@ const App = () => {
     } catch (e) {
       console.error("Failed to fetch docs", e);
     }
-  };
+  }, []);
 
   // Helper: Fetch a new token (used for init and auto-recovery)
   const fetchToken = useCallback(async () => {
@@ -249,6 +249,8 @@ const App = () => {
             // console.log("Heartbeat: Acquired token!");
             authToken = newToken;
             setConnectionError(false); // We are back online!
+            fetchSettings();
+            refreshDocs();
           } else {
             // Still no token (backend likely down or still starting)
             if (!connectionError) setConnectionError(true);
@@ -261,7 +263,11 @@ const App = () => {
         clearTimeout(timeoutId);
 
         if (res.ok) {
-          if (connectionError) setConnectionError(false);
+          if (connectionError) {
+            setConnectionError(false);
+            fetchSettings();
+            refreshDocs();
+          }
         } else {
           // 4xx/5xx means server IS reachable but unhappy.
           if (res.status === 401) {
@@ -273,6 +279,8 @@ const App = () => {
               // console.log("Heartbeat: Re-auth successful!");
               authToken = newToken;
               setConnectionError(false);
+              fetchSettings();
+              refreshDocs();
             } else {
               // console.warn("Heartbeat: Re-auth failed.");
               if (!connectionError) setConnectionError(true);
@@ -293,7 +301,7 @@ const App = () => {
     // Check every 3 seconds for responsive feedback
     const interval = setInterval(checkHealth, 3000);
     return () => clearInterval(interval);
-  }, [isAuthReady, connectionError, fetchToken]);
+  }, [isAuthReady, connectionError, fetchToken, fetchSettings, refreshDocs]);
 
   const handleViewSource = async (filename, chunkText, sourceId = null, directContent = null) => {
     if (directContent) {
