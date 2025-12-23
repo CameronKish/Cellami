@@ -7,7 +7,7 @@ import rehypeSanitize from 'rehype-sanitize';
 
 // In production (hosted PWA), we must point to the local loopback backend.
 // In development (Vite), we use the proxy set in vite.config.js.
-const API_BASE = import.meta.env.PROD ? "http://127.0.0.1:8000/api" : "/api";
+const API_BASE = import.meta.env.PROD ? "https://127.0.0.1:8000/api" : "/api";
 
 let authToken = "";
 

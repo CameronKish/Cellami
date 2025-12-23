@@ -1602,7 +1602,15 @@ if __name__ == "__main__":
 
     # Define server configuration with custom log_config
     # B104: Bind to 127.0.0.1 (localhost) only for security
-    config = uvicorn.Config(app, host="127.0.0.1", port=8000, log_level="info", log_config=log_config)
+    config = uvicorn.Config(
+        app, 
+        host="127.0.0.1", 
+        port=8000, 
+        log_level="info", 
+        log_config=log_config,
+        ssl_keyfile="key.pem",
+        ssl_certfile="cert.pem"
+    )
     server = uvicorn.Server(config)
     
     def resource_path(relative_path):
