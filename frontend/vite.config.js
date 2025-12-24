@@ -50,10 +50,10 @@ export default defineConfig({
             }
           },
           {
-            // Cache HTML pages (Navigation) with StaleWhileRevalidate
-            // This captures the "App Shell" since navigateFallback is off.
-            urlPattern: ({ request }) => request.mode === 'navigate',
-            handler: 'StaleWhileRevalidate',
+            // Cache HTML pages (Navigation) with CacheFirst
+            // "If it's in the cache, USE IT. Don't even ask the network."
+            urlPattern: ({ request, url }) => request.mode === 'navigate' || url.pathname === '/' || url.pathname.endsWith('.html'),
+            handler: 'CacheFirst',
             options: {
               cacheName: 'pages',
               matchOptions: {
