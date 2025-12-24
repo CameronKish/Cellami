@@ -38,7 +38,7 @@ jobs:
     - name: Download mkcert.exe (Required by Spec)
       run: |
         curl -L -o mkcert.exe "https://github.com/FiloSottile/mkcert/releases/download/v1.4.4/mkcert-v1.4.4-windows-amd64.exe"
-      shell: powershell
+      shell: bash
 
     - name: Install Dependencies
       run: |
