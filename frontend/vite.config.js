@@ -50,15 +50,19 @@ export default defineConfig({
             }
           },
           {
-            // Cache HTML pages (Navigation) with NetworkFirst
-            // This allows Vercel to inject scripts/hashes without breaking the Manifest hash check
-            urlPattern: ({ request }) => request.mode === 'navigate',
-            handler: 'NetworkFirst',
+            // Cache HTML pages (Navigation) with StaleWhileRevalidate
+            // 'navigateFallback' relies on precache (which we disabled for HTML).
+            // So we use Runtime Caching to handle the App Shell.
+            urlPattern: ({ request, url }) => request.mode === 'navigate' || url.pathname === '/' || url.pathname === '/index.html',
+            handler: 'StaleWhileRevalidate',
             options: {
               cacheName: 'pages',
               expiration: {
                 maxEntries: 10,
                 maxAgeSeconds: 24 * 60 * 60 // 24 Hours
+              },
+              cacheableResponse: {
+                statuses: [0, 200]
               }
             }
           }
