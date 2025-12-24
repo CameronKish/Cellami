@@ -49,21 +49,35 @@ navigator.serviceWorker.addEventListener('controllerchange', () => {
 navigator.serviceWorker.ready.then(async (reg) => {
   logToScreen(`SW: Ready Check (Active: ${!!reg.active})`);
 
-  // AUDIT: Check if index.html is actually cached
+  // AUDIT: List EVERYTHING in the cache
   try {
     const cacheNames = await caches.keys();
-    let found = false;
+    logToScreen(`Caches found: ${cacheNames.join(', ')}`);
+
     for (const name of cacheNames) {
-      const match = await caches.open(name).then(c => c.match('/index.html'));
-      if (match) {
-        logToScreen(`Cache HIT: /index.html found in ${name} ✅`);
-        found = true;
-        break;
-      }
+      const cache = await caches.open(name);
+      const keys = await cache.keys();
+      const urls = keys.map(k => {
+        const url = new URL(k.url);
+        return url.pathname;
+      });
+      logToScreen(`[${name}] Contains: ${urls.join(', ')}`);
     }
-    if (!found) logToScreen("Cache MISS: /index.html NOT FOUND! ❌");
   } catch (e) {
-    logToScreen(`Cache Check Error: ${e}`);
+    logToScreen(`Audit Error: ${e}`);
+  }
+
+  // FORCE CACHE: Manually stuff index.html into the pocket
+  try {
+    const cache = await caches.open('pages');
+    await cache.add('/index.html');
+    logToScreen("FORCE CACHE: Manually added /index.html to 'pages' ✅");
+
+    // Also add root just in case
+    await cache.add('/');
+    logToScreen("FORCE CACHE: Manually added / to 'pages' ✅");
+  } catch (e) {
+    logToScreen(`FORCE CACHE FAILED: ${e}`);
   }
 
   if (navigator.serviceWorker.controller) {
