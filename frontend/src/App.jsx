@@ -428,6 +428,22 @@ const App = () => {
         Retry Connection
       </button>
 
+      {/* Download Redirect for New Users */}
+      <div className="mt-8 pt-8 border-t border-slate-200 w-full max-w-xs flex flex-col items-center animate-fade-in-up delay-200">
+        <p className="text-slate-500 text-sm mb-3 font-medium">Don't have the companion app?</p>
+        <a
+          href="https://cellami.ai"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-indigo-600 hover:text-indigo-700 text-sm font-bold flex items-center gap-1.5 hover:underline decoration-2 underline-offset-2 transition-colors"
+        >
+          Download for Mac / Windows
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+          </svg>
+        </a>
+      </div>
+
       {/* Subtle Error Message (Bottom Left) */}
       {message && (
         <div className="fixed bottom-2 left-2 max-w-[60%] text-left">

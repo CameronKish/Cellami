@@ -24,7 +24,7 @@ temp_*
 # Build Artifacts
 build/
 dist/
-*.spec
+
 
 # SSL / Binaries
 mkcert

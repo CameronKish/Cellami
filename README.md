@@ -52,7 +52,16 @@ Analyze entire tables at once. Select a range of data, and Cellami will analyze 
 4.  Go to the **Insert** tab > and click the drop down arrow next to **My Add-ins**. 
 5.  Select **Cellami** from the Developer add-ins section.
 
-#### 🪟 Windows
+#### 🌐 Windows / Mac (Testing via Excel Online) - **EASIEST**
+1.  **Run the Cellami App** (ensure the backend is running).
+2.  Open [Excel Online](https://excel.office.com/) in Edge or Chrome.
+3.  Create a Blank Workbook.
+4.  Go to **Insert** > **Add-ins**.
+5.  Select **Upload My Add-in** (often under "Manage My Add-ins" > "Upload My Add-in").
+6.  Upload **`store_package/manifest.prod.xml`**.
+    *   *Note: This verifies the Production setup (Vercel Frontend + Local Backend).*
+
+#### 🪟 Windows (Desktop - Shared Folder Method)
 1.  Create a folder on your computer (e.g., `C:\Manifests`) and put `manifest.prod.xml` inside it.
 2.  **Share the folder:**
     *   Right-click the folder > **Properties** > **Sharing** > **Share...**

@@ -1,0 +1,60 @@
+name: Build Windows Executable
+
+on:
+  workflow_dispatch:  # Manual trigger
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    permissions:
+      contents: read
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    # --- FRONTEND BUILD ---
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        
+    - name: Build Frontend
+      run: |
+        cd frontend
+        npm ci
+        npm run build
+      shell: bash
+
+    # --- BACKEND ENVIRONMENT ---
+    - name: Setup Python 3.12
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+        cache: 'pip'
+
+    - name: Download mkcert.exe (Required by Spec)
+      run: |
+        curl -L -o mkcert.exe "https://github.com/FiloSottile/mkcert/releases/download/v1.4.4/mkcert-v1.4.4-windows-amd64.exe"
+      shell: powershell
+
+    - name: Install Dependencies
+      run: |
+        pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller
+
+    # --- BUILD EXECUTABLE ---
+    - name: Run PyInstaller
+      run: |
+        pyinstaller Cellami_win.spec --clean --noconfirm
+
+    # --- UPLOAD ARTIFACT ---
+    - name: Upload Windows Executable
+      uses: actions/upload-artifact@v4
+      with:
+        name: Cellami-Windows-x64
+        path: dist/Cellami
+        if-no-files-found: error
