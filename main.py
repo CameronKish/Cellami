@@ -1631,6 +1631,18 @@ if __name__ == "__main__":
     # Configure Uvicorn logging to write to our file
     # We copy the default config and add our file handler
     log_config = copy.deepcopy(uvicorn.config.LOGGING_CONFIG)
+
+    # CRITICAL FIX FOR WINDOWS GUI MODE (PyInstaller --windowed)
+    # sys.stdout/stderr are None, causing Uvicorn to crash when checking isatty for colors
+    if sys.stdout is None:
+        sys.stdout = open(os.devnull, 'w')
+    if sys.stderr is None:
+        sys.stderr = open(os.devnull, 'w')
+    
+    # Disable colors if we are in a headless environment
+    for formatter in log_config.get("formatters", {}).values():
+        formatter["use_colors"] = False
+
     log_config["handlers"]["file"] = {
         "class": "logging.FileHandler",
         "filename": LOG_FILE,

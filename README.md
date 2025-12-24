@@ -54,6 +54,7 @@ Analyze entire tables at once. Select a range of data, and Cellami will analyze 
 
 #### 🌐 Windows / Mac (Testing via Excel Online) - **EASIEST**
 1.  **Run the Cellami App** (ensure the backend is running).
+    *   **Windows Users:** You **MUST** Unzip/Extract the file first. Do not run `Cellami.exe` from inside the zip. Right-click > "Extract All".
 2.  Open [Excel Online](https://excel.office.com/) in Edge or Chrome.
 3.  Create a Blank Workbook.
 4.  Go to **Insert** > **Add-ins**.
