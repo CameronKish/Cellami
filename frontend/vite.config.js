@@ -31,6 +31,8 @@ export default defineConfig({
       workbox: {
         clientsClaim: true,
         skipWaiting: true,
+        // CRITICAL: Ignore Excel's query params (?_host_Info=...) so cache matches index.html
+        ignoreURLParametersMatching: [/.*/],
         // EXCLUDE 'html' from globPatterns to prevent strict hash check failure (Vercel Injection)
         globPatterns: ['**/*.{js,css,ico,png,svg,json}'],
         navigateFallback: '/index.html',

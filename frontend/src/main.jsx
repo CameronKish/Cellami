@@ -23,11 +23,37 @@ const updateSW = registerSW({
   },
   onRegistered(swr) {
     logToScreen(`SW: Registered! Scope: ${swr.scope}`);
+
+    // Monitor Lifecycle
+    if (swr.installing) {
+      logToScreen("SW: State = Installing...");
+    }
+    if (swr.waiting) {
+      logToScreen("SW: State = Waiting...");
+    }
+    if (swr.active) {
+      logToScreen("SW: State = Active!");
+    }
   },
   onRegisterError(error) {
     logToScreen(`SW: Error ❌ ${error}`);
   }
 })
+
+// Listen for Controller Change (The moment it takes over)
+navigator.serviceWorker.addEventListener('controllerchange', () => {
+  logToScreen("SW: CONTROLLER CHANGED! (Page is now controlled) 🎮");
+});
+
+// Check current status
+navigator.serviceWorker.ready.then((reg) => {
+  logToScreen(`SW: Ready Check (Active: ${!!reg.active})`);
+  if (navigator.serviceWorker.controller) {
+    logToScreen("SW: Page is ALREADY Controlled. ✅");
+  } else {
+    logToScreen("SW: Page is NOT controlled yet. ⏳");
+  }
+});
 
 // Create Debug Overlay
 const debugDiv = document.createElement('div');
