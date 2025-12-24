@@ -35,7 +35,7 @@ export default defineConfig({
         ignoreURLParametersMatching: [/.*/],
         // EXCLUDE 'html' from globPatterns to prevent strict hash check failure (Vercel Injection)
         globPatterns: ['**/*.{js,css,ico,png,svg,json}'],
-        navigateFallback: '/index.html',
+        // REMOVED navigateFallback to avoid Precache dependency for index.html
         runtimeCaching: [
           {
             urlPattern: ({ url }) => url.pathname.startsWith('/api'),
@@ -51,12 +51,15 @@ export default defineConfig({
           },
           {
             // Cache HTML pages (Navigation) with StaleWhileRevalidate
-            // 'navigateFallback' relies on precache (which we disabled for HTML).
-            // So we use Runtime Caching to handle the App Shell.
-            urlPattern: ({ request, url }) => request.mode === 'navigate' || url.pathname === '/' || url.pathname === '/index.html',
+            // This captures the "App Shell" since navigateFallback is off.
+            urlPattern: ({ request }) => request.mode === 'navigate',
             handler: 'StaleWhileRevalidate',
             options: {
               cacheName: 'pages',
+              matchOptions: {
+                ignoreSearch: true,
+                ignoreVary: true
+              },
               expiration: {
                 maxEntries: 10,
                 maxAgeSeconds: 24 * 60 * 60 // 24 Hours
