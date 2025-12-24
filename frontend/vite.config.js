@@ -31,7 +31,8 @@ export default defineConfig({
       workbox: {
         clientsClaim: true,
         skipWaiting: true,
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,json}'],
+        // EXCLUDE 'html' from globPatterns to prevent strict hash check failure (Vercel Injection)
+        globPatterns: ['**/*.{js,css,ico,png,svg,json}'],
         navigateFallback: '/index.html',
         runtimeCaching: [
           {
@@ -43,6 +44,19 @@ export default defineConfig({
                 options: {
                   maxRetentionTime: 24 * 60 // Retry for max of 24 Hours (optional)
                 }
+              }
+            }
+          },
+          {
+            // Cache HTML pages (Navigation) with NetworkFirst
+            // This allows Vercel to inject scripts/hashes without breaking the Manifest hash check
+            urlPattern: ({ request }) => request.mode === 'navigate',
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'pages',
+              expiration: {
+                maxEntries: 10,
+                maxAgeSeconds: 24 * 60 * 60 // 24 Hours
               }
             }
           }
