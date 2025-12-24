@@ -46,8 +46,26 @@ navigator.serviceWorker.addEventListener('controllerchange', () => {
 });
 
 // Check current status
-navigator.serviceWorker.ready.then((reg) => {
+navigator.serviceWorker.ready.then(async (reg) => {
   logToScreen(`SW: Ready Check (Active: ${!!reg.active})`);
+
+  // AUDIT: Check if index.html is actually cached
+  try {
+    const cacheNames = await caches.keys();
+    let found = false;
+    for (const name of cacheNames) {
+      const match = await caches.open(name).then(c => c.match('/index.html'));
+      if (match) {
+        logToScreen(`Cache HIT: /index.html found in ${name} ✅`);
+        found = true;
+        break;
+      }
+    }
+    if (!found) logToScreen("Cache MISS: /index.html NOT FOUND! ❌");
+  } catch (e) {
+    logToScreen(`Cache Check Error: ${e}`);
+  }
+
   if (navigator.serviceWorker.controller) {
     logToScreen("SW: Page is ALREADY Controlled. ✅");
   } else {
