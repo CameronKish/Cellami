@@ -9,7 +9,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['assets/*'],
+      includeAssets: ['favicon.png', 'assets/*'],
       manifest: {
         name: 'Cellami AI',
         short_name: 'Cellami',

@@ -100,16 +100,42 @@ app = FastAPI()
 
 # Global embedding model (Persistent)
 _embedding_model = None
+ 
+def _configure_fastembed_offline() -> bool:
+    """
+    Checks if the model exists locally.
+    If YES: Sets HF_HUB_OFFLINE=1 and returns True.
+    If NO: Removes HF_HUB_OFFLINE and returns False.
+    """
+    model_root = os.path.join(MODEL_CACHE_DIR, "models--nomic-ai--nomic-embed-text-v1.5")
+    is_offline = False
+
+    if os.path.exists(model_root):
+        snapshots_dir = os.path.join(model_root, "snapshots")
+        if os.path.exists(snapshots_dir) and os.listdir(snapshots_dir):
+            os.environ["HF_HUB_OFFLINE"] = "1"
+            is_offline = True
+    
+    if not is_offline:
+        os.environ.pop("HF_HUB_OFFLINE", None)
+        
+    return is_offline
 
 def preload_model():
     """Download model in background if missing, then unload to save RAM."""
     try:
-        logger.info("Background: Checking/Downloading embedding model...")
+        logger.info("Background: Checking embedding model status...")
+        
+        is_offline = _configure_fastembed_offline()
+        
+        if is_offline:
+            logger.info("Background: Model files found locally. Skipping download check to save I/O.")
+            return
+
+        logger.info("Background: Model not found. Enabling ONLINE mode for download.")
         from fastembed import TextEmbedding # Lazy import
         
-        # Instantiate to trigger download (uses cache if available)
-        # We do NOT assign to the global _embedding_model here, so it verifies files exist
-        # and then frees the memory immediately when this function ends.
+        # Instantiate to trigger download
         temp_model = TextEmbedding(
             model_name="nomic-ai/nomic-embed-text-v1.5",
             cache_dir=MODEL_CACHE_DIR
@@ -143,7 +169,12 @@ async def auth_middleware(request: Request, call_next):
     # Check Token
     token = request.headers.get("X-API-Token")
     if token != SESSION_TOKEN:
-         logger.warning(f"Auth Failed! Header Token: '{token}' vs Session Token: '{SESSION_TOKEN}' | Path: {request.url.path}")
+         # Downgrade to INFO if it's just a stale token (common on restart)
+         if token:
+            logger.info(f"Session Mismatch (Auto-Healing): Frontend token '{token[:8]}...' != Backend '{SESSION_TOKEN[:8]}...' | Path: {request.url.path}")
+         else:
+            logger.warning(f"Auth Blocked! Missing Token. | Path: {request.url.path}")
+            
          return Response(content="Unauthorized", status_code=401)
          
     return await call_next(request)
@@ -294,13 +325,33 @@ def get_next_chunk_id(kb_data: List[Dict]) -> int:
 def get_embedding_model():
     global _embedding_model
     if _embedding_model is None:
-        from fastembed import TextEmbedding # Lazy import to speed up startup
-        logger.info(f"Loading embedding model (nomic-ai/nomic-embed-text-v1.5) from {MODEL_CACHE_DIR}...")
-        _embedding_model = TextEmbedding(
-            model_name="nomic-ai/nomic-embed-text-v1.5",
-            cache_dir=MODEL_CACHE_DIR
-        )
-        logger.info("Embedding model loaded.")
+        try:
+            is_offline = _configure_fastembed_offline()
+            if is_offline:
+                 logger.info("Main: Model found locally. OFFLINE mode enabled.")
+            else:
+                 logger.info("Main: Model not found. ONLINE mode enabled.")
+
+            from fastembed import TextEmbedding # Lazy import to speed up startup
+            logger.info(f"Loading embedding model (nomic-ai/nomic-embed-text-v1.5) from {MODEL_CACHE_DIR}...")
+            
+            try:
+                _embedding_model = TextEmbedding(
+                    model_name="nomic-ai/nomic-embed-text-v1.5",
+                    cache_dir=MODEL_CACHE_DIR,
+                    local_files_only=is_offline
+                )
+            except TypeError:
+                logger.warning("Main: local_files_only param not supported. Retrying without it.")
+                _embedding_model = TextEmbedding(
+                    model_name="nomic-ai/nomic-embed-text-v1.5",
+                    cache_dir=MODEL_CACHE_DIR
+                )
+
+            logger.info("Embedding model loaded.")
+        except Exception as e:
+            logger.error(f"Failed to load embedding model: {e}")
+            return None
     return _embedding_model
 
 def get_local_embedding(text: str) -> List[float]:
