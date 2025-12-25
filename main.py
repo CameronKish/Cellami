@@ -205,17 +205,7 @@ async def auth_middleware(request: Request, call_next):
 # Enable CORS for Office Add-in and Production Frontend
 
 
-# PNA Middleware Definition (added explicitly below)
-async def add_pna_header(request: Request, call_next):
-    response = await call_next(request)
-    origin = request.headers.get("Origin")
-    if origin == "https://cellami.vercel.app":
-        # Manually inject ALL required PNA/CORS headers since CORSMiddleware is dropping them
-        response.headers["Access-Control-Allow-Private-Network"] = "true"
-        response.headers["Access-Control-Allow-Origin"] = origin
-        response.headers["Access-Control-Allow-Credentials"] = "true" 
-        response.headers["Cross-Origin-Resource-Policy"] = "cross-origin"
-    return response
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -236,10 +226,7 @@ app.add_middleware(
     expose_headers=["X-Sources"],
 )
 
-# CRITICAL: Add PNA Middleware LAST so it runs FIRST (wraps CORS), allowing it to inject headers 
-# into the Response even if CORS handles the OPTIONS request.
-from starlette.middleware.base import BaseHTTPMiddleware
-app.add_middleware(BaseHTTPMiddleware, dispatch=add_pna_header)
+
 
 # Middleware to prevent caching of index.html
 
