@@ -161,7 +161,17 @@ async def auth_middleware(request: Request, call_next):
     # Also alow OPTIONS requests for CORS preflight
     if request.method == "OPTIONS":
         logger.info(f"OPTIONS Request from Origin: {request.headers.get('origin')} | Headers: {request.headers}")
-        return await call_next(request)
+        # Explicitly return 200 OK with PNA headers, stopping the middleware chain.
+        # This prevents FastAPI from returning 405 Method Not Allowed for routes that don't have OPTIONS handlers.
+        response = Response(status_code=200)
+        origin = request.headers.get("Origin")
+        if origin in ["https://cellami.vercel.app", "https://app.cellami.ai", "http://localhost:3000"]:
+             response.headers["Access-Control-Allow-Origin"] = origin
+             response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS, DELETE, PUT"
+             response.headers["Access-Control-Allow-Headers"] = "*"
+             response.headers["Access-Control-Allow-Credentials"] = "true"
+             response.headers["Access-Control-Allow-Private-Network"] = "true"
+        return response
         
     if request.url.path in ["/", "/docs", "/openapi.json", "/api/auth/token"] or not request.url.path.startswith("/api"):
         return await call_next(request)
