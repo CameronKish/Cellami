@@ -171,6 +171,7 @@ async def auth_middleware(request: Request, call_next):
              response.headers["Access-Control-Allow-Headers"] = "*"
              response.headers["Access-Control-Allow-Credentials"] = "true"
              response.headers["Access-Control-Allow-Private-Network"] = "true"
+             response.headers["Cross-Origin-Resource-Policy"] = "cross-origin"
         return response
         
     if request.url.path in ["/", "/docs", "/openapi.json", "/api/auth/token"] or not request.url.path.startswith("/api"):
@@ -185,9 +186,16 @@ async def auth_middleware(request: Request, call_next):
          else:
             logger.warning(f"Auth Blocked! Missing Token. | Path: {request.url.path}")
             
-         return Response(content="Unauthorized", status_code=401)
-         
-    return await call_next(request)
+             
+             # Add CORP header to error responses too
+             error_response = Response(content="Unauthorized", status_code=401)
+             error_response.headers["Cross-Origin-Resource-Policy"] = "cross-origin"
+             return error_response
+          
+         # Inject CORP header for successful responses
+         response = await call_next(request)
+         response.headers["Cross-Origin-Resource-Policy"] = "cross-origin"
+         return response
 
 
 # Enable CORS for Office Add-in and Production Frontend
@@ -202,6 +210,7 @@ async def add_pna_header(request: Request, call_next):
         response.headers["Access-Control-Allow-Private-Network"] = "true"
         response.headers["Access-Control-Allow-Origin"] = origin
         response.headers["Access-Control-Allow-Credentials"] = "true" 
+        response.headers["Cross-Origin-Resource-Policy"] = "cross-origin"
     return response
 
 app.add_middleware(
