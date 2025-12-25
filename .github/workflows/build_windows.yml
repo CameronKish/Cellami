@@ -45,6 +45,11 @@ jobs:
         pip install --upgrade pip
         pip install -r requirements.txt
         pip install pyinstaller
+        pip install Pillow
+
+    - name: Generate Icon
+      run: |
+        python -c "from PIL import Image; Image.open('assets/Cellami_Desktop.png').save('assets/icon.ico')"
 
     # --- BUILD EXECUTABLE ---
     - name: Run PyInstaller
