@@ -187,15 +187,15 @@ async def auth_middleware(request: Request, call_next):
             logger.warning(f"Auth Blocked! Missing Token. | Path: {request.url.path}")
             
              
-             # Add CORP header to error responses too
-             error_response = Response(content="Unauthorized", status_code=401)
-             error_response.headers["Cross-Origin-Resource-Policy"] = "cross-origin"
-             return error_response
+         # Add CORP header to error responses too
+         error_response = Response(content="Unauthorized", status_code=401)
+         error_response.headers["Cross-Origin-Resource-Policy"] = "cross-origin"
+         return error_response
           
-         # Inject CORP header for successful responses
-         response = await call_next(request)
-         response.headers["Cross-Origin-Resource-Policy"] = "cross-origin"
-         return response
+    # Inject CORP header for successful responses
+    response = await call_next(request)
+    response.headers["Cross-Origin-Resource-Policy"] = "cross-origin"
+    return response
 
 
 # Enable CORS for Office Add-in and Production Frontend
@@ -1832,6 +1832,8 @@ if __name__ == "__main__":
     def on_quit(icon, item):
         icon.stop()
         server.should_exit = True
+        # Force kill the process to ensure no threads hang (common in PyInstaller)
+        os._exit(0)
 
     def on_show_logs(icon, item):
         """ Open a terminal window tailing the hidden log file """
