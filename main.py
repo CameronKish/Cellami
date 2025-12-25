@@ -158,20 +158,47 @@ async def startup_event():
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
     # Allow public endpoints and non-api routes (like static files)
-    # Also alow OPTIONS requests for CORS preflight
+    # Also allow OPTIONS requests for CORS preflight
     if request.method == "OPTIONS":
-        logger.info(f"OPTIONS Request from Origin: {request.headers.get('origin')} | Headers: {request.headers}")
+        origin = request.headers.get("Origin")
+        pna_request = request.headers.get("Access-Control-Request-Private-Network")
+        logger.info(f"OPTIONS Preflight | Origin: {origin} | PNA: {pna_request} | Path: {request.url.path}")
+        
         # Explicitly return 200 OK with PNA headers, stopping the middleware chain.
         # This prevents FastAPI from returning 405 Method Not Allowed for routes that don't have OPTIONS handlers.
         response = Response(status_code=200)
-        origin = request.headers.get("Origin")
-        if origin in ["https://cellami.vercel.app", "https://app.cellami.ai", "http://localhost:3000"]:
-             response.headers["Access-Control-Allow-Origin"] = origin
-             response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS, DELETE, PUT"
-             response.headers["Access-Control-Allow-Headers"] = "*"
-             response.headers["Access-Control-Allow-Credentials"] = "true"
-             response.headers["Access-Control-Allow-Private-Network"] = "true"
-             response.headers["Cross-Origin-Resource-Policy"] = "cross-origin"
+        
+        # ALLOWED ORIGINS - consolidated list for Office Add-in compatibility
+        allowed_origins = [
+            "https://cellami.vercel.app",
+            "https://app.cellami.ai",
+            "http://localhost:3000",
+            "https://localhost:3000",
+            "http://localhost:5173",
+            "https://localhost:5173",
+            "http://localhost:4173",
+            "http://localhost:8000",
+            "http://127.0.0.1:8000",
+        ]
+        
+        if origin in allowed_origins:
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS, DELETE, PUT"
+            response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-API-Token, Authorization"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            # CRITICAL: Must respond to PNA preflight request with this header
+            response.headers["Access-Control-Allow-Private-Network"] = "true"
+            response.headers["Cross-Origin-Resource-Policy"] = "cross-origin"
+        else:
+            # Log unexpected origins for debugging
+            logger.warning(f"OPTIONS from unknown origin: {origin}")
+            # Still allow the request but without credentials to avoid blocking legitimate traffic
+            if origin:
+                response.headers["Access-Control-Allow-Origin"] = origin
+                response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS, DELETE, PUT"
+                response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-API-Token, Authorization"
+                response.headers["Access-Control-Allow-Private-Network"] = "true"
+                response.headers["Cross-Origin-Resource-Policy"] = "cross-origin"
         return response
         
     response = None
@@ -246,12 +273,10 @@ def list_models():
 @app.middleware("http")
 async def add_security_headers(request, call_next):
     response = await call_next(request)
-    # Aggressive cache busting
+    # Aggressive cache busting for dynamic content
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0"
     response.headers["Pragma"] = "no-cache"
     response.headers["Expires"] = "0"
-    # Allow Vercel (https) to talk to Localhost (http)
-    response.headers["Access-Control-Allow-Private-Network"] = "true"
     return response
 
 # Store background tasks
@@ -1891,29 +1916,3 @@ if __name__ == "__main__":
         pass
         
     setup_tray()
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.responses import Response
-
-async def pna_middleware_logic(request, call_next):
-    # Intercept OPTIONS requests to inject PNA headers immediately
-    # This must run BEFORE CORSMiddleware to prevent it from swallowing the request
-    if request.method == "OPTIONS":
-        response = Response(status_code=200)
-    else:
-        response = await call_next(request)
-    
-    # Inject PNA + CORP headers into ALL responses
-    response.headers["Access-Control-Allow-Private-Network"] = "true"
-    response.headers["Cross-Origin-Resource-Policy"] = "cross-origin"
-    
-    # Ensure CORS headers are present even if CORSMiddleware missed them (double safety)
-    if "Access-Control-Allow-Origin" not in response.headers:
-        origin = request.headers.get("Origin")
-        if origin:
-            response.headers["Access-Control-Allow-Origin"] = origin
-            response.headers["Access-Control-Allow-Credentials"] = "true"
-            response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS, DELETE, PUT"
-            response.headers["Access-Control-Allow-Headers"] = "*"
-            
-    return response
-app.add_middleware(BaseHTTPMiddleware, dispatch=pna_middleware_logic)

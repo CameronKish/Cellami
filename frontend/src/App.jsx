@@ -19,8 +19,17 @@ const fetchAPI = async (url, options = {}) => {
   }
   const headers = { ...options.headers };
   headers['X-API-Token'] = authToken;
-  return fetch(url, { ...options, headers });
+
+  // Add PNA fetch option to explicitly mark this as a local network request
+  // This tells Chrome the request is intentionally targeting a private network address
+  return fetch(url, {
+    ...options,
+    headers,
+    // Chrome's Private Network Access feature requires this for localhost requests
+    targetAddressSpace: 'local'
+  });
 };
+
 
 // --- Reusable UI Components ---
 
@@ -158,7 +167,11 @@ const App = () => {
 
       // 2. Fetch from backend
       // Add cache: no-store AND timestamp to force-bust any aggressive SW/Browser caching
-      const res = await fetch(`${API_BASE}/auth/token?t=${Date.now()}`, { cache: "no-store" });
+      // Include targetAddressSpace for Chrome's Private Network Access compliance
+      const res = await fetch(`${API_BASE}/auth/token?t=${Date.now()}`, {
+        cache: "no-store",
+        targetAddressSpace: 'local'
+      });
       if (res.ok) {
         const data = await res.json();
         console.log("Auth: Token fetch success.");
