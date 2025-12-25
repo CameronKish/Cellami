@@ -174,27 +174,31 @@ async def auth_middleware(request: Request, call_next):
              response.headers["Cross-Origin-Resource-Policy"] = "cross-origin"
         return response
         
-    if request.url.path in ["/", "/docs", "/openapi.json", "/api/auth/token"] or not request.url.path.startswith("/api"):
-        return await call_next(request)
+    response = None
     
-    # Check Token
-    token = request.headers.get("X-API-Token")
-    if token != SESSION_TOKEN:
-         # Downgrade to INFO if it's just a stale token (common on restart)
-         if token:
-            logger.info(f"Session Mismatch (Auto-Healing): Frontend token '{token[:8]}...' != Backend '{SESSION_TOKEN[:8]}...' | Path: {request.url.path}")
-         else:
-            logger.warning(f"Auth Blocked! Missing Token. | Path: {request.url.path}")
-            
-             
-         # Add CORP header to error responses too
-         error_response = Response(content="Unauthorized", status_code=401)
-         error_response.headers["Cross-Origin-Resource-Policy"] = "cross-origin"
-         return error_response
-          
-    # Inject CORP header for successful responses
-    response = await call_next(request)
+    if request.url.path in ["/", "/docs", "/openapi.json", "/api/auth/token"] or not request.url.path.startswith("/api"):
+        # Public Path - Allow through
+        response = await call_next(request)
+    else:
+        # Protected Path - Check Token
+        token = request.headers.get("X-API-Token")
+        if token != SESSION_TOKEN:
+             # Downgrade to INFO if it's just a stale token (common on restart)
+             if token:
+                logger.info(f"Session Mismatch (Auto-Healing): Frontend token '{token[:8]}...' != Backend '{SESSION_TOKEN[:8]}...' | Path: {request.url.path}")
+             else:
+                logger.warning(f"Auth Blocked! Missing Token. | Path: {request.url.path}")
+                
+             response = Response(content="Unauthorized", status_code=401)
+        else:
+             # Success
+             response = await call_next(request)
+
+    # GLOBAL HEADER INJECTION (Apply to ALL responses, public or protected)
+    # This helps resolve COEP/CORP and PNA blocks on Windows/Excel
     response.headers["Cross-Origin-Resource-Policy"] = "cross-origin"
+    response.headers["Access-Control-Allow-Private-Network"] = "true"
+    
     return response
 
 
