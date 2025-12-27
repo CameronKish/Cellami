@@ -190,7 +190,7 @@ const App = () => {
 
   const [connectionError, setConnectionError] = useState(false);
   const [connectionErrorMessage, setConnectionErrorMessage] = useState("");
-  const [showLocalModeOption, setShowLocalModeOption] = useState(false);
+  const [showBrowserFix, setShowBrowserFix] = useState(false);
 
   useEffect(() => {
     const initAuth = async () => {
@@ -231,11 +231,10 @@ const App = () => {
           const isOnLocalhost = window.location.origin.includes('localhost') ||
             window.location.origin.includes('127.0.0.1');
 
-          // On Windows from Vercel, show special LNA workaround UI with a clickable link
-          // User-initiated clicks may bypass LNA restrictions that block script redirects
+          // On Windows from Vercel, show browser fix instructions
           if (isOnVercel && !isOnLocalhost) {
-            console.log("LNA likely blocking. Showing local mode option...");
-            setShowLocalModeOption(true);
+            console.log("LNA likely blocking. Showing browser fix instructions...");
+            setShowBrowserFix(true);
           }
 
           setConnectionError(true);
@@ -430,7 +429,7 @@ const App = () => {
 
   // --- Sub Components ---
 
-  const ConnectionError = ({ message, showLocalMode }) => (
+  const ConnectionError = ({ message, showBrowserFix }) => (
     <div className="flex flex-col min-h-screen items-center justify-center bg-slate-50 p-6 text-center">
       {/* Brand Logo with Glow Effect */}
       <div className="mb-8 relative">
@@ -445,28 +444,32 @@ const App = () => {
       <h2 className="text-2xl font-bold text-slate-900 mb-3 tracking-tight">Connection Failed</h2>
 
       <p className="text-slate-600 max-w-sm mb-4 leading-relaxed font-medium">
-        {showLocalMode
-          ? <>Your browser is blocking the connection.<br />Click below to use Local Mode.</>
+        {showBrowserFix
+          ? <>Your browser is blocking local connections.</>
           : <>Cellami is not reachable.<br />Please ensure the Cellami app is running.</>
         }
       </p>
 
-      {/* Windows LNA Workaround - User-initiated click may bypass browser restrictions */}
-      {showLocalMode ? (
-        <a
-          href={'https://localhost:8000' + window.location.pathname + window.location.search}
-          className="min-w-[200px] px-8 py-4 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-lg shadow-lg shadow-emerald-200 transition-all transform hover:-translate-y-1 active:scale-95 no-underline text-center"
-        >
-          🔓 Switch to Local Mode
-        </a>
-      ) : (
-        <button
-          onClick={() => window.location.reload()}
-          className="min-w-[200px] px-8 py-4 rounded-full bg-sky-600 hover:bg-sky-500 text-white font-bold text-lg shadow-lg shadow-sky-200 transition-all transform hover:-translate-y-1 active:scale-95"
-        >
-          Retry Connection
-        </button>
+      {/* Windows LNA Instructions */}
+      {showBrowserFix && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4 max-w-sm text-left">
+          <p className="text-amber-800 font-semibold text-sm mb-2">⚠️ Windows Browser Fix Required:</p>
+          <ol className="text-amber-700 text-xs space-y-1 list-decimal list-inside">
+            <li>Open a new tab: <code className="bg-amber-100 px-1 rounded">edge://flags</code></li>
+            <li>Search for "local network access"</li>
+            <li>Set to <strong>Disabled</strong></li>
+            <li>Click "Restart" at the bottom</li>
+            <li>Return here and click Retry</li>
+          </ol>
+        </div>
       )}
+
+      <button
+        onClick={() => window.location.reload()}
+        className="min-w-[200px] px-8 py-4 rounded-full bg-sky-600 hover:bg-sky-500 text-white font-bold text-lg shadow-lg shadow-sky-200 transition-all transform hover:-translate-y-1 active:scale-95"
+      >
+        Retry Connection
+      </button>
 
       {/* Download Redirect for New Users */}
       <div className="mt-8 pt-8 border-t border-slate-200 w-full max-w-xs flex flex-col items-center animate-fade-in-up delay-200">
@@ -506,7 +509,7 @@ const App = () => {
   }
 
   if (connectionError) {
-    return <ConnectionError message={connectionErrorMessage} showLocalMode={showLocalModeOption} />;
+    return <ConnectionError message={connectionErrorMessage} showBrowserFix={showBrowserFix} />;
   }
 
   if (!isAuthReady) {

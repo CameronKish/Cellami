@@ -17,7 +17,6 @@
   <SupportUrl DefaultValue="https://cellami.vercel.app/support" />
   <AppDomains>
     <AppDomain>https://cellami.vercel.app</AppDomain>
-    <AppDomain>https://localhost:8000</AppDomain>
   </AppDomains>
 
   <Hosts>
