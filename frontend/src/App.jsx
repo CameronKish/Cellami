@@ -415,7 +415,7 @@ const App = () => {
 
   // --- Sub Components ---
 
-  const ConnectionError = ({ message }) => {
+  const ConnectionError = () => {
     // Detect browser for showing browser-specific tips
     const isEdge = navigator.userAgent.includes('Edg/');
     const isChrome = navigator.userAgent.includes('Chrome/') && !isEdge;
@@ -424,9 +424,10 @@ const App = () => {
     const browserName = isEdge ? 'Edge' : 'Chrome';
 
     return (
-      <div className="flex flex-col min-h-screen items-center bg-gradient-to-br from-slate-100 via-sky-50 to-indigo-100 p-6 pt-12 text-center overflow-y-auto">
-        {/* Brand Logo with Glow Effect */}
-        <div className="mb-6 relative flex-shrink-0">
+      <div className="flex flex-col min-h-screen items-center bg-gradient-to-br from-slate-100 via-sky-50 to-indigo-100 px-6 py-10 text-center overflow-y-auto">
+
+        {/* Logo */}
+        <div className="mb-8 relative">
           <div className="absolute inset-0 bg-sky-400/30 blur-[60px] rounded-full"></div>
           <img
             src="/Cellami_Template.png"
@@ -435,94 +436,89 @@ const App = () => {
           />
         </div>
 
-        <h2 className="text-xl font-bold text-slate-900 mb-3 tracking-tight flex-shrink-0">
+        {/* Title */}
+        <h2 className="text-xl font-bold text-slate-900 mb-4">
           Connection Failed
         </h2>
 
-        {/* Primary message - no bubble */}
-        <p className="text-slate-600 max-w-xs mb-3 text-sm leading-relaxed flex-shrink-0">
+        {/* Primary instruction */}
+        <p className="text-slate-600 text-sm max-w-xs mb-2">
           Unable to connect to your local Cellami app.
         </p>
-
-        <p className="text-slate-700 font-semibold text-sm mb-1 flex-shrink-0">
+        <p className="text-slate-800 font-semibold text-sm mb-2">
           Make sure Cellami is running
         </p>
-        <p className="text-slate-500 text-xs max-w-xs mb-6 flex-shrink-0">
-          Open the app on your computer. Look for it in your system tray (Windows) or dock (Mac).
+        <p className="text-slate-500 text-xs max-w-xs mb-8">
+          Open the app on your computer. Look for it in your system tray or dock.
         </p>
 
+        {/* Retry button */}
         <button
           onClick={() => window.location.reload()}
-          className="min-w-[180px] px-6 py-3 rounded-full bg-sky-600 hover:bg-sky-500 text-white font-bold shadow-lg shadow-sky-200 transition-all transform hover:-translate-y-1 active:scale-95 flex-shrink-0"
+          className="px-8 py-3 rounded-full bg-sky-600 hover:bg-sky-500 text-white font-bold shadow-lg shadow-sky-200 transition-all hover:-translate-y-0.5 active:scale-95"
         >
           Retry Connection
         </button>
 
-        {/* SECTION 2: Still not working */}
-        <div className="w-full max-w-sm mt-10 flex-shrink-0">
-          <p className="text-slate-400 text-xs mb-5 uppercase tracking-wide font-semibold">Still not connecting?</p>
+        {/* Divider */}
+        <div className="w-16 h-px bg-slate-300 my-10"></div>
 
-          <div className="space-y-4">
-            {/* Option: Try Safari/Firefox */}
-            <details className="group backdrop-blur-xl bg-white/40 border border-white/30 rounded-xl shadow-sm overflow-hidden">
-              <summary className="flex items-center justify-between p-3 cursor-pointer list-none">
-                <span className="text-slate-700 font-medium text-sm">Try Safari or Firefox</span>
-                <svg className="w-4 h-4 text-slate-400 group-open:rotate-180 transition-transform flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        {/* Secondary tips - click to expand */}
+        <p className="text-slate-400 text-xs uppercase tracking-wider font-semibold mb-6">
+          Still not working?
+        </p>
+
+        <div className="w-full max-w-xs space-y-4 mb-8">
+          {/* Option: Try Safari/Firefox */}
+          <details className="group bg-white/50 border border-slate-200 rounded-xl overflow-hidden">
+            <summary className="flex items-center justify-between px-4 py-3 cursor-pointer list-none">
+              <span className="text-slate-700 font-medium text-sm">Try Safari or Firefox</span>
+              <svg className="w-4 h-4 text-slate-400 group-open:rotate-180 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </summary>
+            <div className="px-4 pb-4 text-left border-t border-slate-100 pt-3">
+              <p className="text-slate-500 text-xs">
+                Safari and Firefox work best with Cellami and don't require extra setup.
+              </p>
+            </div>
+          </details>
+
+          {/* Option: Chrome/Edge fix - Only show for those browsers */}
+          {isChromiumBrowser && (
+            <details className="group bg-white/50 border border-slate-200 rounded-xl overflow-hidden">
+              <summary className="flex items-center justify-between px-4 py-3 cursor-pointer list-none">
+                <span className="text-slate-700 font-medium text-sm">Adjust {browserName} settings</span>
+                <svg className="w-4 h-4 text-slate-400 group-open:rotate-180 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
               </summary>
-              <div className="px-3 pb-3 text-left">
-                <p className="text-slate-500 text-xs">
-                  Safari and Firefox work best with Cellami and don't require extra setup.
-                </p>
+              <div className="px-4 pb-4 text-left border-t border-slate-100 pt-3">
+                <p className="text-slate-500 text-xs mb-3">{browserName} may block local connections:</p>
+                <ol className="text-slate-600 text-xs space-y-2 list-decimal list-inside">
+                  <li>Go to <code className="bg-slate-200 px-1.5 py-0.5 rounded select-all">{flagUrl}</code></li>
+                  <li>Search for <strong>"Local Network Access"</strong></li>
+                  <li>Set to <strong>Disabled</strong>, click <strong>Restart</strong></li>
+                </ol>
               </div>
             </details>
-
-            {/* Option: Chrome/Edge fix - Only show for those browsers */}
-            {isChromiumBrowser && (
-              <details className="group backdrop-blur-xl bg-white/40 border border-white/30 rounded-xl shadow-sm overflow-hidden">
-                <summary className="flex items-center justify-between p-3 cursor-pointer list-none">
-                  <span className="text-slate-700 font-medium text-sm">Adjust {browserName} settings</span>
-                  <svg className="w-4 h-4 text-slate-400 group-open:rotate-180 transition-transform flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </summary>
-                <div className="px-3 pb-3 text-left">
-                  <p className="text-slate-500 text-xs mb-2">{browserName} may block local connections:</p>
-                  <ol className="text-slate-600 text-xs space-y-1 list-decimal list-inside">
-                    <li>Go to <code className="bg-slate-900/10 px-1 py-0.5 rounded select-all">{flagUrl}</code></li>
-                    <li>Search <strong>"Local Network Access"</strong></li>
-                    <li>Set to <strong>Disabled</strong></li>
-                    <li>Click <strong>Restart</strong></li>
-                  </ol>
-                </div>
-              </details>
-            )}
-          </div>
+          )}
         </div>
 
-        {/* Download Redirect for New Users */}
-        <div className="mt-8 pt-5 border-t border-slate-200/50 w-full max-w-xs flex flex-col items-center flex-shrink-0">
-          <p className="text-slate-500 text-xs mb-2">Don't have the companion app?</p>
+        {/* Download link */}
+        <div className="mt-auto pt-8 border-t border-slate-200/50 w-full max-w-xs flex flex-col items-center">
+          <p className="text-slate-400 text-xs mb-2">Don't have the app?</p>
           <a
             href="https://cellami.vercel.app"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-sky-600 hover:text-sky-700 text-sm font-semibold flex items-center gap-1 hover:underline decoration-2 underline-offset-2 transition-colors"
+            className="text-sky-600 hover:text-sky-700 text-sm font-semibold hover:underline"
           >
-            Download for Mac / Windows
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-            </svg>
+            Download for Mac / Windows →
           </a>
         </div>
 
-        {/* Spacer for scroll padding */}
-        <div className="h-8 flex-shrink-0"></div>
-
-
-
-        {/* Build Timestamp (Bottom Right) */}
+        {/* Build Timestamp */}
         <div className="fixed bottom-2 right-2 text-[10px] text-slate-400 font-mono opacity-50">
           Build: {__BUILD_TIMESTAMP__}
         </div>
@@ -536,7 +532,7 @@ const App = () => {
   }
 
   if (connectionError) {
-    return <ConnectionError message={connectionErrorMessage} />;
+    return <ConnectionError />;
   }
 
   if (!isAuthReady) {
