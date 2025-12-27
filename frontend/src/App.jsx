@@ -424,7 +424,7 @@ const App = () => {
     const browserName = isEdge ? 'Edge' : 'Chrome';
 
     return (
-      <div className="flex flex-col min-h-screen items-center bg-gradient-to-br from-slate-100 via-sky-50 to-indigo-100 px-6 py-10 text-center overflow-y-auto">
+      <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', alignItems: 'center', padding: '40px 24px', textAlign: 'center', overflowY: 'auto', background: 'linear-gradient(to bottom right, #f1f5f9, #f0f9ff, #eef2ff)' }}>
 
         {/* Logo */}
         <div className="mb-6 relative">
@@ -486,8 +486,7 @@ const App = () => {
         {/* Retry button */}
         <button
           onClick={() => window.location.reload()}
-          style={{ marginTop: '24px', marginBottom: '24px' }}
-          className="px-8 py-3 rounded-full bg-sky-600 hover:bg-sky-500 text-white font-bold shadow-lg shadow-sky-200 transition-all hover:-translate-y-0.5 active:scale-95"
+          style={{ marginTop: '24px', marginBottom: '24px', padding: '12px 32px', borderRadius: '9999px', backgroundColor: '#0284c7', color: 'white', fontWeight: 'bold', cursor: 'pointer', border: 'none' }}
         >
           Retry Connection
         </button>
