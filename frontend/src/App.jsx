@@ -486,7 +486,38 @@ const App = () => {
         {/* Retry button */}
         <button
           onClick={() => window.location.reload()}
-          style={{ marginTop: '24px', marginBottom: '24px', padding: '12px 32px', borderRadius: '9999px', backgroundColor: '#0284c7', color: 'white', fontWeight: 'bold', cursor: 'pointer', border: 'none' }}
+          style={{
+            marginTop: '24px',
+            marginBottom: '24px',
+            padding: '14px 36px',
+            borderRadius: '9999px',
+            background: 'rgba(2, 132, 199, 0.85)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            color: 'white',
+            fontWeight: 'bold',
+            fontSize: '15px',
+            cursor: 'pointer',
+            border: '1px solid rgba(255, 255, 255, 0.3)',
+            boxShadow: '0 8px 32px rgba(2, 132, 199, 0.35), inset 0 1px 0 rgba(255,255,255,0.2)',
+            transition: 'all 0.2s ease'
+          }}
+          onMouseOver={(e) => {
+            e.target.style.background = 'rgba(2, 132, 199, 0.95)';
+            e.target.style.transform = 'translateY(-2px)';
+            e.target.style.boxShadow = '0 12px 40px rgba(2, 132, 199, 0.45), inset 0 1px 0 rgba(255,255,255,0.3)';
+          }}
+          onMouseOut={(e) => {
+            e.target.style.background = 'rgba(2, 132, 199, 0.85)';
+            e.target.style.transform = 'translateY(0)';
+            e.target.style.boxShadow = '0 8px 32px rgba(2, 132, 199, 0.35), inset 0 1px 0 rgba(255,255,255,0.2)';
+          }}
+          onMouseDown={(e) => {
+            e.target.style.transform = 'scale(0.97)';
+          }}
+          onMouseUp={(e) => {
+            e.target.style.transform = 'translateY(-2px)';
+          }}
         >
           Retry Connection
         </button>
