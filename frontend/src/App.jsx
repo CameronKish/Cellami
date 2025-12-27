@@ -427,7 +427,7 @@ const App = () => {
       <div className="flex flex-col min-h-screen items-center bg-gradient-to-br from-slate-100 via-sky-50 to-indigo-100 px-6 py-10 text-center overflow-y-auto">
 
         {/* Logo */}
-        <div className="mb-8 relative">
+        <div className="mb-6 relative">
           <div className="absolute inset-0 bg-sky-400/30 blur-[60px] rounded-full"></div>
           <img
             src="/Cellami_Template.png"
@@ -437,25 +437,56 @@ const App = () => {
         </div>
 
         {/* Title */}
-        <h2 className="text-xl font-bold text-slate-900 mb-4">
+        <h2 className="text-xl font-bold text-slate-900 mb-3">
           Connection Failed
         </h2>
 
-        {/* Primary instruction */}
-        <p className="text-slate-600 text-sm max-w-xs mb-2">
+        <p className="text-slate-600 text-sm max-w-xs mb-6">
           Unable to connect to your local Cellami app.
         </p>
-        <p className="text-slate-800 font-semibold text-sm mb-2">
-          Make sure Cellami is running
-        </p>
-        <p className="text-slate-500 text-xs max-w-xs mb-8">
-          Open the app on your computer. Look for it in your system tray or dock.
-        </p>
+
+        {/* Main action bubbles */}
+        <div className="w-full max-w-xs space-y-4 mb-8">
+          {/* Download bubble */}
+          <details className="group bg-white/50 border border-slate-200 rounded-xl overflow-hidden">
+            <summary className="flex items-center justify-between px-5 py-3 cursor-pointer list-none">
+              <span className="text-slate-700 font-medium text-sm">Don't have the app?</span>
+              <svg className="w-4 h-4 text-slate-400 group-open:rotate-180 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </summary>
+            <div className="px-5 pb-4 text-left border-t border-slate-100 pt-3">
+              <a
+                href="https://cellami.vercel.app"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sky-600 hover:text-sky-700 text-sm font-semibold hover:underline"
+              >
+                Download for Mac / Windows →
+              </a>
+            </div>
+          </details>
+
+          {/* Make sure running bubble */}
+          <details className="group bg-white/50 border border-slate-200 rounded-xl overflow-hidden" open>
+            <summary className="flex items-center justify-between px-5 py-3 cursor-pointer list-none">
+              <span className="text-slate-700 font-medium text-sm">Make sure Cellami is running</span>
+              <svg className="w-4 h-4 text-slate-400 group-open:rotate-180 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </summary>
+            <div className="px-5 pb-4 text-left border-t border-slate-100 pt-3">
+              <p className="text-slate-500 text-xs">
+                Open the app on your computer. Look for it in your system tray (Windows) or dock (Mac).
+              </p>
+            </div>
+          </details>
+        </div>
 
         {/* Retry button */}
         <button
           onClick={() => window.location.reload()}
-          className="px-8 py-3 rounded-full bg-sky-600 hover:bg-sky-500 text-white font-bold shadow-lg shadow-sky-200 transition-all hover:-translate-y-0.5 active:scale-95"
+          className="px-10 py-4 rounded-full bg-sky-600 hover:bg-sky-500 text-white font-bold text-lg shadow-lg shadow-sky-200 transition-all hover:-translate-y-0.5 active:scale-95"
         >
           Retry Connection
         </button>
@@ -471,15 +502,15 @@ const App = () => {
         <div className="w-full max-w-xs space-y-4 mb-8">
           {/* Option: Try Safari/Firefox */}
           <details className="group bg-white/50 border border-slate-200 rounded-xl overflow-hidden">
-            <summary className="flex items-center justify-between px-4 py-3 cursor-pointer list-none">
+            <summary className="flex items-center justify-between px-5 py-3 cursor-pointer list-none">
               <span className="text-slate-700 font-medium text-sm">Try Safari or Firefox</span>
               <svg className="w-4 h-4 text-slate-400 group-open:rotate-180 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
             </summary>
-            <div className="px-4 pb-4 text-left border-t border-slate-100 pt-3">
+            <div className="px-5 pb-4 text-left border-t border-slate-100 pt-3">
               <p className="text-slate-500 text-xs">
-                Safari and Firefox work best with Cellami and don't require extra setup.
+                Excel within Safari and Firefox work natively for Cellami. No adjustments to settings required.
               </p>
             </div>
           </details>
@@ -487,13 +518,13 @@ const App = () => {
           {/* Option: Chrome/Edge fix - Only show for those browsers */}
           {isChromiumBrowser && (
             <details className="group bg-white/50 border border-slate-200 rounded-xl overflow-hidden">
-              <summary className="flex items-center justify-between px-4 py-3 cursor-pointer list-none">
+              <summary className="flex items-center justify-between px-5 py-3 cursor-pointer list-none">
                 <span className="text-slate-700 font-medium text-sm">Adjust {browserName} settings</span>
                 <svg className="w-4 h-4 text-slate-400 group-open:rotate-180 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
               </summary>
-              <div className="px-4 pb-4 text-left border-t border-slate-100 pt-3">
+              <div className="px-5 pb-4 text-left border-t border-slate-100 pt-3">
                 <p className="text-slate-500 text-xs mb-3">{browserName} may block local connections:</p>
                 <ol className="text-slate-600 text-xs space-y-2 list-decimal list-inside">
                   <li>Go to <code className="bg-slate-200 px-1.5 py-0.5 rounded select-all">{flagUrl}</code></li>
@@ -503,19 +534,6 @@ const App = () => {
               </div>
             </details>
           )}
-        </div>
-
-        {/* Download link */}
-        <div className="mt-auto pt-8 border-t border-slate-200/50 w-full max-w-xs flex flex-col items-center">
-          <p className="text-slate-400 text-xs mb-2">Don't have the app?</p>
-          <a
-            href="https://cellami.vercel.app"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-sky-600 hover:text-sky-700 text-sm font-semibold hover:underline"
-          >
-            Download for Mac / Windows →
-          </a>
         </div>
 
         {/* Build Timestamp */}
