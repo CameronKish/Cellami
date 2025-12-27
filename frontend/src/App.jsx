@@ -190,6 +190,7 @@ const App = () => {
 
   const [connectionError, setConnectionError] = useState(false);
   const [connectionErrorMessage, setConnectionErrorMessage] = useState("");
+  const [showLocalModeOption, setShowLocalModeOption] = useState(false);
 
   useEffect(() => {
     const initAuth = async () => {
@@ -223,23 +224,18 @@ const App = () => {
           // No token found (Backend likely down or blocked by browser security)
           console.warn("Init: No token found. Backend is down or blocked.");
 
-          // FALLBACK: If we're on Vercel and connection failed, check if localhost:8000 is reachable
+          // FALLBACK: If we're on Vercel and connection failed, show option to use local mode
           // This handles Windows + Chrome's Local Network Access (LNA) blocking cross-origin localhost requests
           const isOnVercel = window.location.origin.includes('cellami.vercel.app') ||
             window.location.origin.includes('app.cellami.ai');
           const isOnLocalhost = window.location.origin.includes('localhost') ||
             window.location.origin.includes('127.0.0.1');
 
-          // Only try fallback once per session to prevent loops
-          const alreadyTriedFallback = sessionStorage.getItem('cellami_fallback_attempted');
-
-          if (isOnVercel && !isOnLocalhost && !alreadyTriedFallback) {
-            sessionStorage.setItem('cellami_fallback_attempted', 'true');
-            // Note: We can't check if localhost is reachable first because LNA also blocks that request.
-            // Just redirect immediately - if backend isn't running, user sees Excel error but can retry.
-            console.log("Fallback: Redirecting to localhost:8000 (Windows LNA workaround)...");
-            window.location.href = 'https://localhost:8000' + window.location.pathname + window.location.search;
-            return;
+          // On Windows from Vercel, show special LNA workaround UI with a clickable link
+          // User-initiated clicks may bypass LNA restrictions that block script redirects
+          if (isOnVercel && !isOnLocalhost) {
+            console.log("LNA likely blocking. Showing local mode option...");
+            setShowLocalModeOption(true);
           }
 
           setConnectionError(true);
@@ -434,7 +430,7 @@ const App = () => {
 
   // --- Sub Components ---
 
-  const ConnectionError = ({ message }) => (
+  const ConnectionError = ({ message, showLocalMode }) => (
     <div className="flex flex-col min-h-screen items-center justify-center bg-slate-50 p-6 text-center">
       {/* Brand Logo with Glow Effect */}
       <div className="mb-8 relative">
@@ -449,16 +445,28 @@ const App = () => {
       <h2 className="text-2xl font-bold text-slate-900 mb-3 tracking-tight">Connection Failed</h2>
 
       <p className="text-slate-600 max-w-sm mb-4 leading-relaxed font-medium">
-        Cellami is not reachable.<br />
-        Please ensure the Cellami app is running.
+        {showLocalMode
+          ? <>Your browser is blocking the connection.<br />Click below to use Local Mode.</>
+          : <>Cellami is not reachable.<br />Please ensure the Cellami app is running.</>
+        }
       </p>
 
-      <button
-        onClick={() => window.location.reload()}
-        className="min-w-[200px] px-8 py-4 rounded-full bg-sky-600 hover:bg-sky-500 text-white font-bold text-lg shadow-lg shadow-sky-200 transition-all transform hover:-translate-y-1 active:scale-95"
-      >
-        Retry Connection
-      </button>
+      {/* Windows LNA Workaround - User-initiated click may bypass browser restrictions */}
+      {showLocalMode ? (
+        <a
+          href={'https://localhost:8000' + window.location.pathname + window.location.search}
+          className="min-w-[200px] px-8 py-4 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-lg shadow-lg shadow-emerald-200 transition-all transform hover:-translate-y-1 active:scale-95 no-underline text-center"
+        >
+          🔓 Switch to Local Mode
+        </a>
+      ) : (
+        <button
+          onClick={() => window.location.reload()}
+          className="min-w-[200px] px-8 py-4 rounded-full bg-sky-600 hover:bg-sky-500 text-white font-bold text-lg shadow-lg shadow-sky-200 transition-all transform hover:-translate-y-1 active:scale-95"
+        >
+          Retry Connection
+        </button>
+      )}
 
       {/* Download Redirect for New Users */}
       <div className="mt-8 pt-8 border-t border-slate-200 w-full max-w-xs flex flex-col items-center animate-fade-in-up delay-200">
@@ -498,7 +506,7 @@ const App = () => {
   }
 
   if (connectionError) {
-    return <ConnectionError message={connectionErrorMessage} />;
+    return <ConnectionError message={connectionErrorMessage} showLocalMode={showLocalModeOption} />;
   }
 
   if (!isAuthReady) {
