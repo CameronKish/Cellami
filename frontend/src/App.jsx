@@ -220,9 +220,23 @@ const App = () => {
             setConnectionError(true);
           }
         } else {
-          // No token found (Backend likely down)
-          // Strictly fail connection to prevent empty UI
-          console.warn("Init: No token found. Backend is down.");
+          // No token found (Backend likely down or blocked by browser security)
+          console.warn("Init: No token found. Backend is down or blocked.");
+
+          // FALLBACK: If we're on Vercel and connection failed, try redirecting to localhost:8000
+          // This handles Windows + Chrome's Local Network Access (LNA) blocking cross-origin localhost requests
+          const isOnVercel = window.location.origin.includes('cellami.vercel.app') ||
+            window.location.origin.includes('app.cellami.ai');
+          const isOnLocalhost = window.location.origin.includes('localhost') ||
+            window.location.origin.includes('127.0.0.1');
+
+          if (isOnVercel && !isOnLocalhost) {
+            console.log("Fallback: Redirecting to localhost:8000 (LNA workaround)...");
+            // Preserve any query params (like Excel's _host_Info)
+            window.location.href = 'https://localhost:8000' + window.location.pathname + window.location.search;
+            return; // Stop execution, redirect will happen
+          }
+
           setConnectionError(true);
         }
       } catch (e) {

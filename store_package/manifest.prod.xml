@@ -17,7 +17,7 @@
   <SupportUrl DefaultValue="https://cellami.vercel.app/support" />
   <AppDomains>
     <AppDomain>https://cellami.vercel.app</AppDomain>
-    <!-- Add your Vercel/Netlify domain here if different from above -->
+    <AppDomain>https://localhost:8000</AppDomain>
   </AppDomains>
 
   <Hosts>
