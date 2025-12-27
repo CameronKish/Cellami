@@ -190,7 +190,7 @@ const App = () => {
 
   const [connectionError, setConnectionError] = useState(false);
   const [connectionErrorMessage, setConnectionErrorMessage] = useState("");
-  const [showBrowserFix, setShowBrowserFix] = useState(false);
+
 
   useEffect(() => {
     const initAuth = async () => {
@@ -223,20 +223,6 @@ const App = () => {
         } else {
           // No token found (Backend likely down or blocked by browser security)
           console.warn("Init: No token found. Backend is down or blocked.");
-
-          // FALLBACK: If we're on Vercel and connection failed, show option to use local mode
-          // This handles Windows + Chrome's Local Network Access (LNA) blocking cross-origin localhost requests
-          const isOnVercel = window.location.origin.includes('cellami.vercel.app') ||
-            window.location.origin.includes('app.cellami.ai');
-          const isOnLocalhost = window.location.origin.includes('localhost') ||
-            window.location.origin.includes('127.0.0.1');
-
-          // On Windows from Vercel, show browser fix instructions
-          if (isOnVercel && !isOnLocalhost) {
-            console.log("LNA likely blocking. Showing browser fix instructions...");
-            setShowBrowserFix(true);
-          }
-
           setConnectionError(true);
         }
       } catch (e) {
@@ -429,14 +415,13 @@ const App = () => {
 
   // --- Sub Components ---
 
-  const ConnectionError = ({ message, showBrowserFix }) => {
-    // Detect browser for showing correct flag URL
+  const ConnectionError = ({ message }) => {
+    // Detect browser for showing browser-specific tips
     const isEdge = navigator.userAgent.includes('Edg/');
     const isChrome = navigator.userAgent.includes('Chrome/') && !isEdge;
-    const flagUrl = isEdge ? 'edge://flags/#block-insecure-private-network-requests'
-      : isChrome ? 'chrome://flags/#block-insecure-private-network-requests'
-        : null;
-    const browserName = isEdge ? 'Edge' : isChrome ? 'Chrome' : 'your browser';
+    const isChromiumBrowser = isChrome || isEdge;
+    const flagUrl = isEdge ? 'edge://flags' : 'chrome://flags';
+    const browserName = isEdge ? 'Edge' : 'Chrome';
 
     return (
       <div className="flex flex-col min-h-screen items-center justify-center bg-gradient-to-br from-slate-100 via-sky-50 to-indigo-100 p-6 text-center">
@@ -450,47 +435,46 @@ const App = () => {
           />
         </div>
 
-        <h2 className="text-2xl font-bold text-slate-900 mb-2 tracking-tight">
-          {showBrowserFix ? "Browser Compatibility Issue" : "Connection Failed"}
+        <h2 className="text-2xl font-bold text-slate-900 mb-3 tracking-tight">
+          Connection Failed
         </h2>
 
-        <p className="text-slate-600 max-w-sm mb-6 leading-relaxed">
-          {showBrowserFix
-            ? <>{browserName} is blocking the connection to your local Cellami app.</>
-            : <>Cellami is not reachable.<br />Please ensure the Cellami app is running.</>
-          }
+        <p className="text-slate-600 max-w-sm mb-8 leading-relaxed">
+          Unable to connect to your local Cellami app.<br />
+          Please make sure the companion app is running.
         </p>
 
-        {/* Browser Fix Options - Collapsible */}
-        {showBrowserFix && (
-          <div className="w-full max-w-sm space-y-3 mb-6">
-            {/* Option 1: Switch Browser */}
-            <details className="group backdrop-blur-xl bg-white/60 border border-white/40 rounded-2xl shadow-lg overflow-hidden">
-              <summary className="flex items-center justify-between p-4 cursor-pointer list-none">
-                <span className="text-slate-800 font-semibold text-sm">Switch to a compatible browser</span>
-                <svg className="w-5 h-5 text-slate-400 group-open:rotate-180 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </summary>
-              <div className="px-4 pb-4 text-left">
-                <p className="text-slate-600 text-sm">
-                  Open Excel Online in <strong>Safari</strong> or <strong>Firefox</strong> — they work without any extra configuration.
-                </p>
-              </div>
-            </details>
+        {/* Troubleshooting Options - Collapsible */}
+        <div className="w-full max-w-sm space-y-4 mb-8">
+          {/* Option 1: Start the app */}
+          <details className="group backdrop-blur-xl bg-white/60 border border-white/40 rounded-2xl shadow-lg overflow-hidden">
+            <summary className="flex items-center justify-between p-4 cursor-pointer list-none">
+              <span className="text-slate-800 font-semibold text-sm">Start the Cellami app</span>
+              <svg className="w-5 h-5 text-slate-400 group-open:rotate-180 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </summary>
+            <div className="px-4 pb-4 text-left">
+              <p className="text-slate-600 text-sm">
+                Open the Cellami app on your computer. You should see it running in your system tray or dock.
+              </p>
+            </div>
+          </details>
 
-            {/* Option 2: Disable Flag */}
+          {/* Option 2: Browser fix - Only show for Chrome/Edge */}
+          {isChromiumBrowser && (
             <details className="group backdrop-blur-xl bg-white/60 border border-white/40 rounded-2xl shadow-lg overflow-hidden">
               <summary className="flex items-center justify-between p-4 cursor-pointer list-none">
-                <span className="text-slate-800 font-semibold text-sm">Adjust {browserName} settings</span>
+                <span className="text-slate-800 font-semibold text-sm">Adjust {browserName} security settings</span>
                 <svg className="w-5 h-5 text-slate-400 group-open:rotate-180 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
               </summary>
               <div className="px-4 pb-4 text-left">
+                <p className="text-slate-500 text-xs mb-3">{browserName} may block local connections. To fix:</p>
                 <ol className="text-slate-600 text-sm space-y-2 list-decimal list-inside">
-                  <li>Copy this into a new tab:<br />
-                    <code className="inline-block mt-1 bg-slate-900/10 backdrop-blur px-2 py-1 rounded-lg text-xs text-slate-700 select-all">{flagUrl || 'chrome://flags'}</code>
+                  <li>Open a new tab and go to:<br />
+                    <code className="inline-block mt-1 bg-slate-900/10 px-2 py-1 rounded-lg text-xs text-slate-700 select-all">{flagUrl}</code>
                   </li>
                   <li>Search for <strong>"Local Network Access"</strong></li>
                   <li>Set to <strong>Disabled</strong></li>
@@ -498,18 +482,33 @@ const App = () => {
                 </ol>
               </div>
             </details>
-          </div>
-        )}
+          )}
+
+          {/* Option 3: Try different browser */}
+          <details className="group backdrop-blur-xl bg-white/60 border border-white/40 rounded-2xl shadow-lg overflow-hidden">
+            <summary className="flex items-center justify-between p-4 cursor-pointer list-none">
+              <span className="text-slate-800 font-semibold text-sm">Try a different browser</span>
+              <svg className="w-5 h-5 text-slate-400 group-open:rotate-180 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </summary>
+            <div className="px-4 pb-4 text-left">
+              <p className="text-slate-600 text-sm">
+                <strong>Safari</strong> and <strong>Firefox</strong> work best with Cellami and don't require any extra configuration.
+              </p>
+            </div>
+          </details>
+        </div>
 
         <button
           onClick={() => window.location.reload()}
-          className="min-w-[200px] px-8 py-4 rounded-full bg-gradient-to-r from-sky-500 to-indigo-500 hover:from-sky-400 hover:to-indigo-400 text-white font-bold text-lg shadow-xl shadow-sky-500/25 transition-all transform hover:-translate-y-1 active:scale-95"
+          className="min-w-[200px] px-8 py-4 rounded-full bg-sky-600 hover:bg-sky-500 text-white font-bold text-lg shadow-lg shadow-sky-200 transition-all transform hover:-translate-y-1 active:scale-95"
         >
           Retry Connection
         </button>
 
         {/* Download Redirect for New Users */}
-        <div className="mt-8 pt-6 border-t border-slate-200/50 w-full max-w-xs flex flex-col items-center">
+        <div className="mt-10 pt-6 border-t border-slate-200/50 w-full max-w-xs flex flex-col items-center">
           <p className="text-slate-500 text-sm mb-2">Don't have the companion app?</p>
           <a
             href="https://cellami.vercel.app"
@@ -547,7 +546,7 @@ const App = () => {
   }
 
   if (connectionError) {
-    return <ConnectionError message={connectionErrorMessage} showBrowserFix={showBrowserFix} />;
+    return <ConnectionError message={connectionErrorMessage} />;
   }
 
   if (!isAuthReady) {
