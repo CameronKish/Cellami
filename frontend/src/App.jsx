@@ -459,7 +459,7 @@ const App = () => {
       <div className="mt-8 pt-8 border-t border-slate-200 w-full max-w-xs flex flex-col items-center animate-fade-in-up delay-200">
         <p className="text-slate-500 text-sm mb-3 font-medium">Don't have the companion app?</p>
         <a
-          href="https://cellami.ai"
+          href="https://cellami.vercel.app"
           target="_blank"
           rel="noopener noreferrer"
           className="text-indigo-600 hover:text-indigo-700 text-sm font-bold flex items-center gap-1.5 hover:underline decoration-2 underline-offset-2 transition-colors"
