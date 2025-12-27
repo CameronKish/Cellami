@@ -424,7 +424,7 @@ const App = () => {
     const browserName = isEdge ? 'Edge' : 'Chrome';
 
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', alignItems: 'center', padding: '40px 24px', textAlign: 'center', overflowY: 'auto', background: 'linear-gradient(to bottom right, #f1f5f9, #f0f9ff, #eef2ff)' }}>
+      <div style={{ position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 24px', textAlign: 'center', overflowY: 'auto', background: 'linear-gradient(to bottom right, #f1f5f9, #f0f9ff, #eef2ff)' }}>
 
         {/* Logo */}
         <div className="mb-6 relative">
@@ -468,7 +468,7 @@ const App = () => {
           </details>
 
           {/* Make sure running bubble */}
-          <details className="group bg-white/50 border border-slate-200 rounded-xl overflow-hidden" open>
+          <details className="group bg-white/50 border border-slate-200 rounded-xl overflow-hidden">
             <summary className="flex items-center justify-between cursor-pointer list-none" style={{ padding: '12px 16px' }}>
               <span className="text-slate-700 font-medium text-sm">Make sure Cellami is running</span>
               <svg className="w-4 h-4 text-slate-400 group-open:rotate-180 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
