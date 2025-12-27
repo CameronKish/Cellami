@@ -446,16 +446,16 @@ const App = () => {
         </p>
 
         {/* Main action bubbles */}
-        <div className="w-full max-w-xs space-y-4 mb-8 mx-2">
+        <div className="w-full max-w-xs space-y-4 mb-8" style={{ padding: '0 8px' }}>
           {/* Download bubble */}
           <details className="group bg-white/50 border border-slate-200 rounded-xl overflow-hidden">
-            <summary className="flex items-center justify-between px-6 py-3 cursor-pointer list-none">
+            <summary className="flex items-center justify-between cursor-pointer list-none" style={{ padding: '12px 16px' }}>
               <span className="text-slate-700 font-medium text-sm">Don't have the app?</span>
               <svg className="w-4 h-4 text-slate-400 group-open:rotate-180 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
             </summary>
-            <div className="px-6 pb-4 text-left border-t border-slate-100 pt-3">
+            <div className="text-left border-t border-slate-100" style={{ padding: '12px 16px 16px 16px' }}>
               <a
                 href="https://cellami.vercel.app"
                 target="_blank"
@@ -469,13 +469,13 @@ const App = () => {
 
           {/* Make sure running bubble */}
           <details className="group bg-white/50 border border-slate-200 rounded-xl overflow-hidden" open>
-            <summary className="flex items-center justify-between px-6 py-3 cursor-pointer list-none">
+            <summary className="flex items-center justify-between cursor-pointer list-none" style={{ padding: '12px 16px' }}>
               <span className="text-slate-700 font-medium text-sm">Make sure Cellami is running</span>
               <svg className="w-4 h-4 text-slate-400 group-open:rotate-180 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
             </summary>
-            <div className="px-6 pb-4 text-left border-t border-slate-100 pt-3">
+            <div className="text-left border-t border-slate-100" style={{ padding: '12px 16px 16px 16px' }}>
               <p className="text-slate-500 text-xs">
                 Open the app on your computer. Look for it in your system tray (Windows) or dock (Mac).
               </p>
@@ -499,16 +499,16 @@ const App = () => {
           Still not working?
         </p>
 
-        <div className="w-full max-w-xs space-y-4 mb-8 mx-2">
+        <div className="w-full max-w-xs space-y-4 mb-8" style={{ padding: '0 8px' }}>
           {/* Option: Try Safari/Firefox */}
           <details className="group bg-white/50 border border-slate-200 rounded-xl overflow-hidden">
-            <summary className="flex items-center justify-between px-6 py-3 cursor-pointer list-none">
+            <summary className="flex items-center justify-between cursor-pointer list-none" style={{ padding: '12px 16px' }}>
               <span className="text-slate-700 font-medium text-sm">Try Safari or Firefox</span>
               <svg className="w-4 h-4 text-slate-400 group-open:rotate-180 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
             </summary>
-            <div className="px-6 pb-4 text-left border-t border-slate-100 pt-3">
+            <div className="text-left border-t border-slate-100" style={{ padding: '12px 16px 16px 16px' }}>
               <p className="text-slate-500 text-xs">
                 Excel within Safari and Firefox work natively for Cellami. No adjustments to settings required.
               </p>
@@ -518,13 +518,13 @@ const App = () => {
           {/* Option: Chrome/Edge fix - Only show for those browsers */}
           {isChromiumBrowser && (
             <details className="group bg-white/50 border border-slate-200 rounded-xl overflow-hidden">
-              <summary className="flex items-center justify-between px-6 py-3 cursor-pointer list-none">
+              <summary className="flex items-center justify-between cursor-pointer list-none" style={{ padding: '12px 16px' }}>
                 <span className="text-slate-700 font-medium text-sm">Adjust {browserName} settings</span>
                 <svg className="w-4 h-4 text-slate-400 group-open:rotate-180 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
               </summary>
-              <div className="px-6 pb-4 text-left border-t border-slate-100 pt-3">
+              <div className="text-left border-t border-slate-100" style={{ padding: '12px 16px 16px 16px' }}>
                 <p className="text-slate-500 text-xs mb-3">{browserName} may block local connections:</p>
                 <ol className="text-slate-600 text-xs space-y-2 list-decimal list-inside">
                   <li>Go to <code className="bg-slate-200 px-1.5 py-0.5 rounded select-all">{flagUrl}</code></li>
