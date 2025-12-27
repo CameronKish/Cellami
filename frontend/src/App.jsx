@@ -230,7 +230,12 @@ const App = () => {
           const isOnLocalhost = window.location.origin.includes('localhost') ||
             window.location.origin.includes('127.0.0.1');
 
-          if (isOnVercel && !isOnLocalhost) {
+          // Only redirect once per session - if we've already tried and failed, show error instead
+          // This prevents redirect loops when backend is simply not running
+          const alreadyTriedFallback = sessionStorage.getItem('cellami_fallback_attempted');
+
+          if (isOnVercel && !isOnLocalhost && !alreadyTriedFallback) {
+            sessionStorage.setItem('cellami_fallback_attempted', 'true');
             console.log("Fallback: Redirecting to localhost:8000 (LNA workaround)...");
             // Preserve any query params (like Excel's _host_Info)
             window.location.href = 'https://localhost:8000' + window.location.pathname + window.location.search;
