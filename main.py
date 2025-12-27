@@ -178,7 +178,9 @@ async def auth_middleware(request: Request, call_next):
             "https://localhost:5173",
             "http://localhost:4173",
             "http://localhost:8000",
+            "https://localhost:8000",  # Self-hosted frontend (HTTPS)
             "http://127.0.0.1:8000",
+            "https://127.0.0.1:8000",  # Self-hosted frontend (HTTPS)
         ]
         
         if origin in allowed_origins:
