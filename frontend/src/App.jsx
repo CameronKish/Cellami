@@ -499,7 +499,7 @@ const App = () => {
           Still not working?
         </p>
 
-        <div className="w-full max-w-xs space-y-4 mb-8">
+        <div className="w-full max-w-xs space-y-4 mb-8 mx-2">
           {/* Option: Try Safari/Firefox */}
           <details className="group bg-white/50 border border-slate-200 rounded-xl overflow-hidden">
             <summary className="flex items-center justify-between px-6 py-3 cursor-pointer list-none">
