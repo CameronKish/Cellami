@@ -1780,24 +1780,35 @@ if __name__ == "__main__":
                      return None
 
             elif sys.platform == "win32":
-                # Windows
+                # Windows - Combine mkcert CA install AND loopback exemption in one admin elevation
                 import ctypes
                 
                 MB_OKCANCEL = 0x00000001
                 MB_ICONINFORMATION = 0x00000040
                 IDOK = 1
-                msg = "Cellami needs to set up a secure local connection for Excel.\n\nPlease click 'Yes' in the next window to trust the local certificate."
+                msg = "Cellami needs to set up a secure local connection for Excel.\n\nThis will:\n• Install a trusted local certificate\n• Enable Excel Desktop add-in connectivity\n\nPlease click 'Yes' in the next window to continue."
                 ret = ctypes.windll.user32.MessageBoxW(0, msg, "Cellami Setup", MB_OKCANCEL | MB_ICONINFORMATION)
                 
                 if ret != IDOK:
                     return None
-                    
-                ret = ctypes.windll.shell32.ShellExecuteW(None, "runas", abs_mkcert, "-install", None, 1)
+                
+                # Create a combined batch script for both admin tasks
+                setup_script_path = os.path.join(USER_DATA_DIR, "setup_admin.bat")
+                with open(setup_script_path, "w") as f:
+                    f.write("@echo off\n")
+                    # Task 1: Install mkcert CA
+                    f.write(f'"{abs_mkcert}" -install\n')
+                    # Task 2: Add loopback exemption for Excel Desktop WebView2
+                    f.write('CheckNetIsolation LoopbackExempt -a -n="microsoft.win32webviewhost_cw5n1h2txyewy" 2>nul\n')
+                    f.write("exit /b 0\n")
+                
+                # Run the combined script with admin elevation
+                ret = ctypes.windll.shell32.ShellExecuteW(None, "runas", "cmd.exe", f'/c "{setup_script_path}"', None, 0)
                 if ret <= 32:
-                     return None
+                    return None
                 
                 import time
-                time.sleep(2) 
+                time.sleep(3)  # Give time for both commands to complete 
             
             logger.info("SSL: Root CA Install Triggered.")
             

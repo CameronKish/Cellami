@@ -429,80 +429,108 @@ const App = () => {
 
   // --- Sub Components ---
 
-  const ConnectionError = ({ message, showBrowserFix }) => (
-    <div className="flex flex-col min-h-screen items-center justify-center bg-slate-50 p-6 text-center">
-      {/* Brand Logo with Glow Effect */}
-      <div className="mb-8 relative">
-        <div className="absolute inset-0 bg-sky-400/20 blur-[50px] rounded-full"></div>
-        <img
-          src="/Cellami_Template.png"
-          alt="Cellami Logo"
-          className="relative w-24 h-24 object-contain drop-shadow-xl"
-        />
-      </div>
+  const ConnectionError = ({ message, showBrowserFix }) => {
+    // Detect browser for showing correct flag URL
+    const isEdge = navigator.userAgent.includes('Edg/');
+    const isChrome = navigator.userAgent.includes('Chrome/') && !isEdge;
+    const flagUrl = isEdge ? 'edge://flags/#block-insecure-private-network-requests'
+      : isChrome ? 'chrome://flags/#block-insecure-private-network-requests'
+        : null;
+    const browserName = isEdge ? 'Edge' : isChrome ? 'Chrome' : 'your browser';
 
-      <h2 className="text-2xl font-bold text-slate-900 mb-3 tracking-tight">Connection Failed</h2>
-
-      <p className="text-slate-600 max-w-sm mb-4 leading-relaxed font-medium">
-        {showBrowserFix
-          ? <>Your browser is blocking local connections.</>
-          : <>Cellami is not reachable.<br />Please ensure the Cellami app is running.</>
-        }
-      </p>
-
-      {/* Windows LNA Instructions */}
-      {showBrowserFix && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4 max-w-sm text-left">
-          <p className="text-amber-800 font-semibold text-sm mb-2">⚠️ Windows Browser Fix Required:</p>
-          <ol className="text-amber-700 text-xs space-y-1 list-decimal list-inside">
-            <li>Open a new tab: <code className="bg-amber-100 px-1 rounded">edge://flags</code></li>
-            <li>Search for "local network access"</li>
-            <li>Set to <strong>Disabled</strong></li>
-            <li>Click "Restart" at the bottom</li>
-            <li>Return here and click Retry</li>
-          </ol>
+    return (
+      <div className="flex flex-col min-h-screen items-center justify-center bg-slate-50 p-6 text-center">
+        {/* Brand Logo with Glow Effect */}
+        <div className="mb-6 relative">
+          <div className="absolute inset-0 bg-sky-400/20 blur-[50px] rounded-full"></div>
+          <img
+            src="/Cellami_Template.png"
+            alt="Cellami Logo"
+            className="relative w-20 h-20 object-contain drop-shadow-xl"
+          />
         </div>
-      )}
 
-      <button
-        onClick={() => window.location.reload()}
-        className="min-w-[200px] px-8 py-4 rounded-full bg-sky-600 hover:bg-sky-500 text-white font-bold text-lg shadow-lg shadow-sky-200 transition-all transform hover:-translate-y-1 active:scale-95"
-      >
-        Retry Connection
-      </button>
+        <h2 className="text-2xl font-bold text-slate-900 mb-2 tracking-tight">
+          {showBrowserFix ? "Browser Compatibility Issue" : "Connection Failed"}
+        </h2>
 
-      {/* Download Redirect for New Users */}
-      <div className="mt-8 pt-8 border-t border-slate-200 w-full max-w-xs flex flex-col items-center animate-fade-in-up delay-200">
-        <p className="text-slate-500 text-sm mb-3 font-medium">Don't have the companion app?</p>
-        <a
-          href="https://cellami.vercel.app"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-indigo-600 hover:text-indigo-700 text-sm font-bold flex items-center gap-1.5 hover:underline decoration-2 underline-offset-2 transition-colors"
+        <p className="text-slate-600 max-w-sm mb-6 leading-relaxed">
+          {showBrowserFix
+            ? <>{browserName} is blocking the connection to your local Cellami app.</>
+            : <>Cellami is not reachable.<br />Please ensure the Cellami app is running.</>
+          }
+        </p>
+
+        {/* Browser Fix Options */}
+        {showBrowserFix && (
+          <div className="w-full max-w-sm space-y-4 mb-6">
+            {/* Option 1: Switch Browser (Easiest) */}
+            <div className="bg-white border border-slate-200 rounded-xl p-4 text-left shadow-sm">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="bg-sky-100 text-sky-700 text-xs font-bold px-2 py-0.5 rounded">Easiest</span>
+                <span className="text-slate-800 font-semibold text-sm">Use a different browser</span>
+              </div>
+              <p className="text-slate-600 text-xs">
+                Open Excel Online in <strong>Safari</strong> or <strong>Firefox</strong> — they work without any extra steps.
+              </p>
+            </div>
+
+            {/* Option 2: Disable Flag (Advanced) */}
+            <div className="bg-white border border-slate-200 rounded-xl p-4 text-left shadow-sm">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="bg-slate-100 text-slate-600 text-xs font-bold px-2 py-0.5 rounded">Advanced</span>
+                <span className="text-slate-800 font-semibold text-sm">Adjust {browserName} settings</span>
+              </div>
+              <ol className="text-slate-600 text-xs space-y-1 list-decimal list-inside">
+                <li>Copy and paste into a new tab: <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-700 select-all">{flagUrl || 'chrome://flags'}</code></li>
+                <li>Find <strong>"Local Network Access Checks"</strong></li>
+                <li>Change to <strong>Disabled</strong></li>
+                <li>Click <strong>Restart</strong> at the bottom</li>
+              </ol>
+            </div>
+          </div>
+        )}
+
+        <button
+          onClick={() => window.location.reload()}
+          className="min-w-[200px] px-8 py-4 rounded-full bg-sky-600 hover:bg-sky-500 text-white font-bold text-lg shadow-lg shadow-sky-200 transition-all transform hover:-translate-y-1 active:scale-95"
         >
-          Download for Mac / Windows
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-          </svg>
-        </a>
-      </div>
+          Retry Connection
+        </button>
 
-      {/* Subtle Error Message (Bottom Left) */}
-      {message && (
-        <div className="fixed bottom-2 left-2 max-w-[60%] text-left">
-          <pre className="text-red-400/80 text-[10px] font-mono break-words whitespace-pre-wrap">
-            {message}
-          </pre>
+        {/* Download Redirect for New Users */}
+        <div className="mt-8 pt-6 border-t border-slate-200 w-full max-w-xs flex flex-col items-center">
+          <p className="text-slate-500 text-sm mb-2">Don't have the companion app?</p>
+          <a
+            href="https://cellami.vercel.app"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sky-600 hover:text-sky-700 text-sm font-semibold flex items-center gap-1.5 hover:underline decoration-2 underline-offset-2 transition-colors"
+          >
+            Download for Mac / Windows
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            </svg>
+          </a>
         </div>
-      )}
 
-      {/* Build Timestamp (Bottom Right) */}
-      <div className="fixed bottom-2 right-2 text-[10px] text-slate-400 font-mono opacity-50">
-        Build: {__BUILD_TIMESTAMP__}
+        {/* Subtle Error Message (Bottom Left) */}
+        {message && (
+          <div className="fixed bottom-2 left-2 max-w-[60%] text-left">
+            <pre className="text-red-400/80 text-[10px] font-mono break-words whitespace-pre-wrap">
+              {message}
+            </pre>
+          </div>
+        )}
+
+        {/* Build Timestamp (Bottom Right) */}
+        <div className="fixed bottom-2 right-2 text-[10px] text-slate-400 font-mono opacity-50">
+          Build: {__BUILD_TIMESTAMP__}
+        </div>
+
       </div>
-
-    </div>
-  );
+    );
+  };
 
   if (!isOfficeInitialized) {
     return <DownloadPage />;
