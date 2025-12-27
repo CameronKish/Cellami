@@ -223,23 +223,36 @@ const App = () => {
           // No token found (Backend likely down or blocked by browser security)
           console.warn("Init: No token found. Backend is down or blocked.");
 
-          // FALLBACK: If we're on Vercel and connection failed, try redirecting to localhost:8000
+          // FALLBACK: If we're on Vercel and connection failed, check if localhost:8000 is reachable
           // This handles Windows + Chrome's Local Network Access (LNA) blocking cross-origin localhost requests
           const isOnVercel = window.location.origin.includes('cellami.vercel.app') ||
             window.location.origin.includes('app.cellami.ai');
           const isOnLocalhost = window.location.origin.includes('localhost') ||
             window.location.origin.includes('127.0.0.1');
 
-          // Only redirect once per session - if we've already tried and failed, show error instead
-          // This prevents redirect loops when backend is simply not running
+          // Only try fallback once per session to prevent loops
           const alreadyTriedFallback = sessionStorage.getItem('cellami_fallback_attempted');
 
           if (isOnVercel && !isOnLocalhost && !alreadyTriedFallback) {
             sessionStorage.setItem('cellami_fallback_attempted', 'true');
-            console.log("Fallback: Redirecting to localhost:8000 (LNA workaround)...");
-            // Preserve any query params (like Excel's _host_Info)
-            window.location.href = 'https://localhost:8000' + window.location.pathname + window.location.search;
-            return; // Stop execution, redirect will happen
+
+            // Check if localhost:8000 is actually reachable before redirecting
+            // This prevents redirecting to a dead page when backend isn't running
+            try {
+              console.log("Fallback: Testing if localhost:8000 is reachable...");
+              const testResponse = await fetch('https://localhost:8000/', {
+                method: 'HEAD',
+                mode: 'no-cors',  // no-cors to avoid CORS errors, we just want to know if it responds
+                cache: 'no-store'
+              });
+              // If we get here without throwing, localhost:8000 is reachable
+              console.log("Fallback: localhost:8000 is reachable, redirecting...");
+              window.location.href = 'https://localhost:8000' + window.location.pathname + window.location.search;
+              return;
+            } catch (fallbackError) {
+              console.warn("Fallback: localhost:8000 is not reachable, showing error instead.", fallbackError);
+              // Don't redirect, fall through to show Cellami error
+            }
           }
 
           setConnectionError(true);
