@@ -439,10 +439,10 @@ const App = () => {
     const browserName = isEdge ? 'Edge' : isChrome ? 'Chrome' : 'your browser';
 
     return (
-      <div className="flex flex-col min-h-screen items-center justify-center bg-slate-50 p-6 text-center">
+      <div className="flex flex-col min-h-screen items-center justify-center bg-gradient-to-br from-slate-100 via-sky-50 to-indigo-100 p-6 text-center">
         {/* Brand Logo with Glow Effect */}
         <div className="mb-6 relative">
-          <div className="absolute inset-0 bg-sky-400/20 blur-[50px] rounded-full"></div>
+          <div className="absolute inset-0 bg-sky-400/30 blur-[60px] rounded-full"></div>
           <img
             src="/Cellami_Template.png"
             alt="Cellami Logo"
@@ -461,45 +461,55 @@ const App = () => {
           }
         </p>
 
-        {/* Browser Fix Options */}
+        {/* Browser Fix Options - Collapsible */}
         {showBrowserFix && (
-          <div className="w-full max-w-sm space-y-4 mb-6">
-            {/* Option 1: Switch Browser (Easiest) */}
-            <div className="bg-white border border-slate-200 rounded-xl p-4 text-left shadow-sm">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="bg-sky-100 text-sky-700 text-xs font-bold px-2 py-0.5 rounded">Easiest</span>
-                <span className="text-slate-800 font-semibold text-sm">Use a different browser</span>
+          <div className="w-full max-w-sm space-y-3 mb-6">
+            {/* Option 1: Switch Browser */}
+            <details className="group backdrop-blur-xl bg-white/60 border border-white/40 rounded-2xl shadow-lg overflow-hidden">
+              <summary className="flex items-center justify-between p-4 cursor-pointer list-none">
+                <span className="text-slate-800 font-semibold text-sm">Switch to a compatible browser</span>
+                <svg className="w-5 h-5 text-slate-400 group-open:rotate-180 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </summary>
+              <div className="px-4 pb-4 text-left">
+                <p className="text-slate-600 text-sm">
+                  Open Excel Online in <strong>Safari</strong> or <strong>Firefox</strong> — they work without any extra configuration.
+                </p>
               </div>
-              <p className="text-slate-600 text-xs">
-                Open Excel Online in <strong>Safari</strong> or <strong>Firefox</strong> — they work without any extra steps.
-              </p>
-            </div>
+            </details>
 
-            {/* Option 2: Disable Flag (Advanced) */}
-            <div className="bg-white border border-slate-200 rounded-xl p-4 text-left shadow-sm">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="bg-slate-100 text-slate-600 text-xs font-bold px-2 py-0.5 rounded">Advanced</span>
+            {/* Option 2: Disable Flag */}
+            <details className="group backdrop-blur-xl bg-white/60 border border-white/40 rounded-2xl shadow-lg overflow-hidden">
+              <summary className="flex items-center justify-between p-4 cursor-pointer list-none">
                 <span className="text-slate-800 font-semibold text-sm">Adjust {browserName} settings</span>
+                <svg className="w-5 h-5 text-slate-400 group-open:rotate-180 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </summary>
+              <div className="px-4 pb-4 text-left">
+                <ol className="text-slate-600 text-sm space-y-2 list-decimal list-inside">
+                  <li>Copy this into a new tab:<br />
+                    <code className="inline-block mt-1 bg-slate-900/10 backdrop-blur px-2 py-1 rounded-lg text-xs text-slate-700 select-all">{flagUrl || 'chrome://flags'}</code>
+                  </li>
+                  <li>Search for <strong>"Local Network Access"</strong></li>
+                  <li>Set to <strong>Disabled</strong></li>
+                  <li>Click <strong>Restart</strong> at the bottom</li>
+                </ol>
               </div>
-              <ol className="text-slate-600 text-xs space-y-1 list-decimal list-inside">
-                <li>Copy and paste into a new tab: <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-700 select-all">{flagUrl || 'chrome://flags'}</code></li>
-                <li>Find <strong>"Local Network Access Checks"</strong></li>
-                <li>Change to <strong>Disabled</strong></li>
-                <li>Click <strong>Restart</strong> at the bottom</li>
-              </ol>
-            </div>
+            </details>
           </div>
         )}
 
         <button
           onClick={() => window.location.reload()}
-          className="min-w-[200px] px-8 py-4 rounded-full bg-sky-600 hover:bg-sky-500 text-white font-bold text-lg shadow-lg shadow-sky-200 transition-all transform hover:-translate-y-1 active:scale-95"
+          className="min-w-[200px] px-8 py-4 rounded-full bg-gradient-to-r from-sky-500 to-indigo-500 hover:from-sky-400 hover:to-indigo-400 text-white font-bold text-lg shadow-xl shadow-sky-500/25 transition-all transform hover:-translate-y-1 active:scale-95"
         >
           Retry Connection
         </button>
 
         {/* Download Redirect for New Users */}
-        <div className="mt-8 pt-6 border-t border-slate-200 w-full max-w-xs flex flex-col items-center">
+        <div className="mt-8 pt-6 border-t border-slate-200/50 w-full max-w-xs flex flex-col items-center">
           <p className="text-slate-500 text-sm mb-2">Don't have the companion app?</p>
           <a
             href="https://cellami.vercel.app"

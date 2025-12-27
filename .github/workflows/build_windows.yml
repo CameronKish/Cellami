@@ -1,9 +1,7 @@
 name: Build Windows Executable
 
 on:
-  workflow_dispatch:  # Manual trigger
-  push:
-    branches: [ "main" ]
+  workflow_dispatch:  # Manual trigger only
 
 jobs:
   build:
