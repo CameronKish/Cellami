@@ -486,7 +486,8 @@ const App = () => {
         {/* Retry button */}
         <button
           onClick={() => window.location.reload()}
-          className="px-10 py-4 rounded-full bg-sky-600 hover:bg-sky-500 text-white font-bold text-lg shadow-lg shadow-sky-200 transition-all hover:-translate-y-0.5 active:scale-95"
+          style={{ marginTop: '24px', marginBottom: '24px' }}
+          className="px-8 py-3 rounded-full bg-sky-600 hover:bg-sky-500 text-white font-bold shadow-lg shadow-sky-200 transition-all hover:-translate-y-0.5 active:scale-95"
         >
           Retry Connection
         </button>
