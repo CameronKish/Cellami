@@ -446,7 +446,7 @@ const App = () => {
         </p>
 
         {/* Main action bubbles */}
-        <div className="w-full max-w-xs space-y-4 mb-8">
+        <div className="w-full max-w-xs space-y-4 mb-8 mx-2">
           {/* Download bubble */}
           <details className="group bg-white/50 border border-slate-200 rounded-xl overflow-hidden">
             <summary className="flex items-center justify-between px-6 py-3 cursor-pointer list-none">
