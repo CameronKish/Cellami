@@ -426,7 +426,7 @@ const App = () => {
     return (
       <div className="flex flex-col min-h-screen items-center justify-center bg-gradient-to-br from-slate-100 via-sky-50 to-indigo-100 p-6 text-center">
         {/* Brand Logo with Glow Effect */}
-        <div className="mb-6 relative">
+        <div className="mb-8 relative">
           <div className="absolute inset-0 bg-sky-400/30 blur-[60px] rounded-full"></div>
           <img
             src="/Cellami_Template.png"
@@ -435,77 +435,71 @@ const App = () => {
           />
         </div>
 
-        <h2 className="text-2xl font-bold text-slate-900 mb-3 tracking-tight">
+        <h2 className="text-2xl font-bold text-slate-900 mb-4 tracking-tight">
           Connection Failed
         </h2>
 
         <p className="text-slate-600 max-w-sm mb-8 leading-relaxed">
-          Unable to connect to your local Cellami app.<br />
-          Please make sure the companion app is running.
+          Unable to connect to your local Cellami app.
         </p>
 
-        {/* Troubleshooting Options - Collapsible */}
-        <div className="w-full max-w-sm space-y-4 mb-8">
-          {/* Option 1: Start the app */}
-          <details className="group backdrop-blur-xl bg-white/60 border border-white/40 rounded-2xl shadow-lg overflow-hidden">
-            <summary className="flex items-center justify-between p-4 cursor-pointer list-none">
-              <span className="text-slate-800 font-semibold text-sm">Start the Cellami app</span>
-              <svg className="w-5 h-5 text-slate-400 group-open:rotate-180 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </summary>
-            <div className="px-4 pb-4 text-left">
-              <p className="text-slate-600 text-sm">
-                Open the Cellami app on your computer. You should see it running in your system tray or dock.
-              </p>
-            </div>
-          </details>
-
-          {/* Option 2: Browser fix - Only show for Chrome/Edge */}
-          {isChromiumBrowser && (
-            <details className="group backdrop-blur-xl bg-white/60 border border-white/40 rounded-2xl shadow-lg overflow-hidden">
-              <summary className="flex items-center justify-between p-4 cursor-pointer list-none">
-                <span className="text-slate-800 font-semibold text-sm">Adjust {browserName} security settings</span>
-                <svg className="w-5 h-5 text-slate-400 group-open:rotate-180 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </summary>
-              <div className="px-4 pb-4 text-left">
-                <p className="text-slate-500 text-xs mb-3">{browserName} may block local connections. To fix:</p>
-                <ol className="text-slate-600 text-sm space-y-2 list-decimal list-inside">
-                  <li>Open a new tab and go to:<br />
-                    <code className="inline-block mt-1 bg-slate-900/10 px-2 py-1 rounded-lg text-xs text-slate-700 select-all">{flagUrl}</code>
-                  </li>
-                  <li>Search for <strong>"Local Network Access"</strong></li>
-                  <li>Set to <strong>Disabled</strong></li>
-                  <li>Click <strong>Restart</strong> at the bottom</li>
-                </ol>
-              </div>
-            </details>
-          )}
-
-          {/* Option 3: Try different browser */}
-          <details className="group backdrop-blur-xl bg-white/60 border border-white/40 rounded-2xl shadow-lg overflow-hidden">
-            <summary className="flex items-center justify-between p-4 cursor-pointer list-none">
-              <span className="text-slate-800 font-semibold text-sm">Try a different browser</span>
-              <svg className="w-5 h-5 text-slate-400 group-open:rotate-180 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </summary>
-            <div className="px-4 pb-4 text-left">
-              <p className="text-slate-600 text-sm">
-                <strong>Safari</strong> and <strong>Firefox</strong> work best with Cellami and don't require any extra configuration.
-              </p>
-            </div>
-          </details>
+        {/* SECTION 1: Primary Action */}
+        <div className="w-full max-w-sm backdrop-blur-xl bg-white/60 border border-white/40 rounded-2xl shadow-lg p-5 mb-6">
+          <p className="text-slate-800 font-semibold text-sm mb-2">Make sure Cellami is running</p>
+          <p className="text-slate-500 text-sm">
+            Open the Cellami app on your computer. Look for it in your system tray (Windows) or dock (Mac).
+          </p>
         </div>
 
         <button
           onClick={() => window.location.reload()}
-          className="min-w-[200px] px-8 py-4 rounded-full bg-sky-600 hover:bg-sky-500 text-white font-bold text-lg shadow-lg shadow-sky-200 transition-all transform hover:-translate-y-1 active:scale-95"
+          className="min-w-[200px] px-8 py-4 rounded-full bg-sky-600 hover:bg-sky-500 text-white font-bold text-lg shadow-lg shadow-sky-200 transition-all transform hover:-translate-y-1 active:scale-95 mb-10"
         >
           Retry Connection
         </button>
+
+        {/* SECTION 2: Still not working */}
+        <div className="w-full max-w-sm">
+          <p className="text-slate-500 text-xs mb-4 uppercase tracking-wide font-semibold">Still not connecting?</p>
+
+          <div className="space-y-3">
+            {/* Option: Try Safari/Firefox */}
+            <details className="group backdrop-blur-xl bg-white/40 border border-white/30 rounded-xl shadow-sm overflow-hidden">
+              <summary className="flex items-center justify-between p-3 cursor-pointer list-none">
+                <span className="text-slate-700 font-medium text-sm">Try Safari or Firefox</span>
+                <svg className="w-4 h-4 text-slate-400 group-open:rotate-180 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </summary>
+              <div className="px-3 pb-3 text-left">
+                <p className="text-slate-500 text-xs">
+                  Safari and Firefox work best with Cellami and don't require extra setup.
+                </p>
+              </div>
+            </details>
+
+            {/* Option: Chrome/Edge fix - Only show for those browsers */}
+            {isChromiumBrowser && (
+              <details className="group backdrop-blur-xl bg-white/40 border border-white/30 rounded-xl shadow-sm overflow-hidden">
+                <summary className="flex items-center justify-between p-3 cursor-pointer list-none">
+                  <span className="text-slate-700 font-medium text-sm">Adjust {browserName} settings</span>
+                  <svg className="w-4 h-4 text-slate-400 group-open:rotate-180 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </summary>
+                <div className="px-3 pb-3 text-left">
+                  <p className="text-slate-500 text-xs mb-2">{browserName} may block local connections:</p>
+                  <ol className="text-slate-600 text-xs space-y-1 list-decimal list-inside">
+                    <li>Go to <code className="bg-slate-900/10 px-1 py-0.5 rounded select-all">{flagUrl}</code></li>
+                    <li>Search <strong>"Local Network Access"</strong></li>
+                    <li>Set to <strong>Disabled</strong></li>
+                    <li>Click <strong>Restart</strong></li>
+                  </ol>
+                </div>
+              </details>
+            )}
+          </div>
+        </div>
 
         {/* Download Redirect for New Users */}
         <div className="mt-10 pt-6 border-t border-slate-200/50 w-full max-w-xs flex flex-col items-center">
