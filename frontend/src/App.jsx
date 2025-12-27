@@ -235,24 +235,11 @@ const App = () => {
 
           if (isOnVercel && !isOnLocalhost && !alreadyTriedFallback) {
             sessionStorage.setItem('cellami_fallback_attempted', 'true');
-
-            // Check if localhost:8000 is actually reachable before redirecting
-            // This prevents redirecting to a dead page when backend isn't running
-            try {
-              console.log("Fallback: Testing if localhost:8000 is reachable...");
-              const testResponse = await fetch('https://localhost:8000/', {
-                method: 'HEAD',
-                mode: 'no-cors',  // no-cors to avoid CORS errors, we just want to know if it responds
-                cache: 'no-store'
-              });
-              // If we get here without throwing, localhost:8000 is reachable
-              console.log("Fallback: localhost:8000 is reachable, redirecting...");
-              window.location.href = 'https://localhost:8000' + window.location.pathname + window.location.search;
-              return;
-            } catch (fallbackError) {
-              console.warn("Fallback: localhost:8000 is not reachable, showing error instead.", fallbackError);
-              // Don't redirect, fall through to show Cellami error
-            }
+            // Note: We can't check if localhost is reachable first because LNA also blocks that request.
+            // Just redirect immediately - if backend isn't running, user sees Excel error but can retry.
+            console.log("Fallback: Redirecting to localhost:8000 (Windows LNA workaround)...");
+            window.location.href = 'https://localhost:8000' + window.location.pathname + window.location.search;
+            return;
           }
 
           setConnectionError(true);
