@@ -90,12 +90,10 @@ if [ -f "$INFO_PLIST" ]; then
 fi
 
 echo "✅ Build Complete!"
-cp manifest.prod.xml dist/
-echo "📄 Copied manifest.prod.xml to dist/"
 echo "🎉 Your app is ready at: dist/Cellami.app"
 
 echo "🤐 Zipping for Release..."
 cd dist
-zip -r Cellami_Mac.zip Cellami.app manifest.prod.xml
+zip -r Cellami_Mac.zip Cellami.app
 cd ..
 echo "📦 Release Artifact Ready: dist/Cellami_Mac.zip"

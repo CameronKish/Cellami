@@ -424,7 +424,7 @@ const App = () => {
     const browserName = isEdge ? 'Edge' : 'Chrome';
 
     return (
-      <div style={{ position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 24px', textAlign: 'center', overflowY: 'auto', background: 'linear-gradient(to bottom right, #f1f5f9, #f0f9ff, #eef2ff)' }}>
+      <div style={{ position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 24px', textAlign: 'center', overflowY: 'auto', backgroundColor: '#ffffff', backgroundImage: 'radial-gradient(circle at 50% -20%, #f6f8ff 0%, transparent 70%), radial-gradient(circle at 80% 20%, #f8f9ff 0%, transparent 50%), radial-gradient(circle at 10% 30%, #f9fafb 0%, transparent 50%)' }}>
 
         {/* Logo */}
         <div className="mb-6 relative">
