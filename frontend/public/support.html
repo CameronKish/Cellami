@@ -4,41 +4,139 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cellami Support</title>
+    <title>Support - Cellami</title>
     <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
         body {
-            font-family: -apple-system, system-ui, sans-serif;
-            max-width: 600px;
-            margin: 40px auto;
-            padding: 20px;
-            line-height: 1.6;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 48px 24px;
+            line-height: 1.7;
+            color: #1a1a1a;
+            background: #fafafa;
         }
 
         h1 {
-            color: #1a1a1a;
+            font-size: 2rem;
+            margin-bottom: 8px;
+            color: #0f172a;
         }
 
-        .button {
+        .subtitle {
+            color: #64748b;
+            font-size: 1.1rem;
+            margin-bottom: 32px;
+        }
+
+        h2 {
+            font-size: 1.25rem;
+            margin: 32px 0 12px 0;
+            color: #334155;
+        }
+
+        p {
+            margin-bottom: 16px;
+            color: #475569;
+        }
+
+        a {
+            color: #0284c7;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 32px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            margin-bottom: 24px;
+        }
+
+        .faq {
+            border-left: 3px solid #0284c7;
+            padding-left: 16px;
+            margin: 16px 0;
+        }
+
+        .faq strong {
+            display: block;
+            margin-bottom: 4px;
+            color: #1e293b;
+        }
+
+        .contact-btn {
             display: inline-block;
-            padding: 10px 20px;
-            background: #0070f3;
+            background: #0284c7;
             color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
             text-decoration: none;
-            border-radius: 5px;
+            font-weight: 600;
+            margin-top: 8px;
+        }
+
+        .contact-btn:hover {
+            background: #0369a1;
         }
     </style>
 </head>
 
 <body>
-    <h1>Cellami Support</h1>
-    <p>Need help with the Cellami Excel Add-in?</p>
+    <div class="card">
+        <h1>Support</h1>
+        <p class="subtitle">Get help with Cellami</p>
 
-    <h2>Contact Us</h2>
-    <p>For bug reports, feature requests, or general help, please visit our GitHub repository:</p>
-    <p><a href="https://github.com/CameronKish/Cellami/issues" class="button">Open an Issue on GitHub</a></p>
+        <h2>Getting Started</h2>
+        <p>Cellami requires a companion desktop application to function. Make sure you have:</p>
+        <ol style="padding-left: 24px; margin-bottom: 16px; color: #475569;">
+            <li>Downloaded the Cellami app for <a href="/">Mac or Windows</a></li>
+            <li>Installed and launched the app (look for it in your system tray or dock)</li>
+            <li>Installed the Excel add-in from Microsoft AppSource</li>
+        </ol>
 
-    <h2>Documentation</h2>
-    <p>Visit our <a href="/">Main App</a> for usage guides.</p>
+        <h2>Frequently Asked Questions</h2>
+
+        <div class="faq">
+            <strong>Why do I see "Connection Failed"?</strong>
+            <p>Make sure the Cellami desktop app is running. If using Chrome or Edge, you may need to adjust browser
+                security settings - the add-in will guide you through this.</p>
+        </div>
+
+        <div class="faq">
+            <strong>Is my data sent to the cloud?</strong>
+            <p>No. By default, all AI processing happens locally on your machine. Your Excel data never leaves your
+                computer unless you explicitly configure a third-party API.</p>
+        </div>
+
+        <div class="faq">
+            <strong>Which AI models are supported?</strong>
+            <p>Cellami works with Ollama and supports any model you have installed locally, including Llama, Mistral,
+                Qwen, and more.</p>
+        </div>
+
+        <div class="faq">
+            <strong>Does it work on Mac and Windows?</strong>
+            <p>Yes! The desktop companion app is available for both macOS and Windows.</p>
+        </div>
+
+        <h2>Contact Us</h2>
+        <p>Having issues or want to share feedback?</p>
+        <a href="https://github.com/CameronKish/Cellami/issues" class="contact-btn" target="_blank">Report an Issue on
+            GitHub</a>
+    </div>
+
+    <div class="card">
+        <h2>Legal</h2>
+        <p>
+            <a href="/privacy.html">Privacy Policy</a> ·
+            <a href="/terms.html">Terms of Use</a>
+        </p>
+    </div>
 </body>
 
 </html>

@@ -90,6 +90,11 @@ if [ -f "$INFO_PLIST" ]; then
 fi
 
 echo "✅ Build Complete!"
+
+# Clean up the extra Cellami folder (onedir artifact)
+rm -rf dist/Cellami
+echo "🧹 Cleaned up build artifacts"
+
 echo "🎉 Your app is ready at: dist/Cellami.app"
 
 echo "🤐 Zipping for Release..."
