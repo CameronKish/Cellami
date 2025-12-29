@@ -10,23 +10,24 @@
 
 ### 1. Knowledge Base
 Upload your own documents (PDFs, Word, etc.) and ask questions based on them. Cellami uses your local files to provide accurate, context-aware answers.
-![Knowledge Base Demo](assets/Cellami%20Knowledge%20Base%20Demo.gif)
+![Knowledge Base Demo](assets/Screenshots/Cellami%20-%20Docs%20SC.png)
 
 ### 2. Query Cells
 Select any cell in your spreadsheet and ask Cellami to process it. Perfect for quick analysis, summarization, or extraction tasks on specific data points. Activate the knowledge base for context-aware answers.
-![Cell Query Demo](assets/Cellami%20Cell%20Query%20Demo.gif)
+![Cell Query Demo](assets/Screenshots/Cellami%20-%20Cell%20Query%20SC.png)
 
-### 3. Audit Answers
-Trace back every answer to its source. The Audit tab shows you exactly which document chunks were used to generate a response, ensuring transparency and trust.
-![Audit Tab Demo](assets/Cellami%20Audit%20Demo.gif)
-
-### 4. Chat with Tables
-Have a free-form conversation with your data. The Chat tab allows for open-ended questions and follow-ups, maintaining context throughout your session.
-![Chat Tab Demo](assets/Cellami%20Chat%20Demo.gif)
-
-### 5. Query Tables
+### 3. Query Tables
 Analyze entire tables at once. Select a range of data, and Cellami will analyze the full table or individual entries sequentially to provide comprehensive insights. Activate the knowledge base for context-aware answers.
-![Table Query Demo](assets/Cellami%20Table%20Query%20Demo.gif)
+![Table Query Demo](assets/Screenshots/Cellami%20-%20Table%20Query%20SC.png)
+
+### 4. Audit Answers
+Trace back every answer to its source. The Audit tab shows you exactly which document chunks were used to generate a response, ensuring transparency and trust.
+![Audit Tab Demo](assets/Screenshots/Cellami%20-%20Audit%20SC.png)
+
+### 5. Chat with Tables
+Have a free-form conversation with your data. The Chat tab allows for open-ended questions and follow-ups, maintaining context throughout your session.
+![Chat Tab Demo](assets/Screenshots/Cellami%20-%20Chat%20SC.png)
+
 
 ---
 
