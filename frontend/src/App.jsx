@@ -688,6 +688,37 @@ const App = () => {
 
             <div className="flex flex-col gap-3">
               <button onClick={() => setShowAbout(false)} className="btn btn-primary w-full py-2.5" style={{ borderRadius: '12px' }}>Close</button>
+
+              {/* Legal Links */}
+              <div className="flex justify-center gap-4 mt-2">
+                <a
+                  href="https://cellami.vercel.app/privacy.html"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-slate-400 hover:text-sky-600 text-[10px] transition-colors"
+                >
+                  Privacy
+                </a>
+                <span className="text-slate-300">·</span>
+                <a
+                  href="https://cellami.vercel.app/terms.html"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-slate-400 hover:text-sky-600 text-[10px] transition-colors"
+                >
+                  Terms
+                </a>
+                <span className="text-slate-300">·</span>
+                <a
+                  href="https://cellami.vercel.app/support.html"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-slate-400 hover:text-sky-600 text-[10px] transition-colors"
+                >
+                  Support
+                </a>
+              </div>
+
               <p className="text-slate-400 text-[9px] uppercase tracking-[0.2em] mt-2 font-bold opacity-80">Empowering Data Analysts</p>
             </div>
           </div>
