@@ -3820,6 +3820,13 @@ const SettingsView = ({
     fetchModels();
   }, []);
 
+  // Auto-select first model if none selected (initial setup)
+  useEffect(() => {
+    if (availableModels.length > 0 && !config.model_name) {
+      setConfig(prev => ({ ...prev, model_name: availableModels[0] }));
+    }
+  }, [availableModels, config.model_name]);
+
   const save = async () => {
     setSaveStatus('saving');
     try {
