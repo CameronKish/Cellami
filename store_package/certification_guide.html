@@ -203,13 +203,26 @@
 
     <h2>3. Installation Steps</h2>
     <div class="section">
-        <h3>Step 1: Install Ollama</h3>
+        <h3>Step 1: Get the Add-in in Excel</h3>
+        <p>You can test the add-in in either <strong>Excel Desktop</strong> or <strong>Excel Online</strong> (browser).
+            Both methods work, but Excel Online is the easiest for testing:</p>
+
+        <h4>Option A: Excel Online (Recommended for Testing)</h4>
         <ol>
-            <li>Download Ollama from <a href="https://ollama.com">ollama.com</a></li>
-            <li>Install and launch Ollama</li>
-            <li>Open Terminal (Mac) or Command Prompt (Windows)</li>
-            <li>Run: <code>ollama pull gemma3:4b</code></li>
-            <li>Wait for the model to download (~3GB)</li>
+            <li>Go to <a href="https://excel.office.com">excel.office.com</a> in your browser (Refer to "6. Browser
+                Compatibility").</li>
+            <li>Create or open a workbook</li>
+            <li>Go to Insert → Add-ins → Upload My Add-in (or search for 'Cellami' if available)</li>
+            <li>Upload the Cellami manifest file</li>
+            <li>The Cellami panel will appear on the right side</li>
+        </ol>
+
+        <h4>Option B: Excel Desktop</h4>
+        <ol>
+            <li>Open Microsoft Excel on your computer</li>
+            <li>Go to Insert → My Add-ins</li>
+            <li>Load the Cellami add-in</li>
+            <li>The Cellami panel will appear on the right side</li>
         </ol>
 
         <h3>Step 2: Install Cellami Desktop App</h3>
@@ -233,27 +246,17 @@
             <li>Look for Cellami icon in the system tray (bottom-right of screen)</li>
         </ol>
 
-        <h3>Step 3: Load the Add-in in Excel</h3>
-        <p>You can test the add-in in either <strong>Excel Desktop</strong> or <strong>Excel Online</strong> (browser).
-            Both methods work, but Excel Online is the easiest for testing:</p>
-
-        <h4>Option A: Excel Online (Recommended for Testing)</h4>
+        <h3>Step 3: Install Ollama</h3>
         <ol>
-            <li>Go to <a href="https://excel.office.com">excel.office.com</a> in your browser (Refer to "6. Browser
-                Compatibility").</li>
-            <li>Create or open a workbook</li>
-            <li>Go to Insert → Add-ins → Upload My Add-in</li>
-            <li>Upload the Cellami manifest file</li>
-            <li>The Cellami panel will appear on the right side</li>
+            <li>Download Ollama from <a href="https://ollama.com">ollama.com</a></li>
+            <li>Install and launch Ollama</li>
+            <li>Open Terminal (Mac) or Command Prompt (Windows)</li>
+            <li>Run: <code>ollama pull gemma3:4b</code></li>
+            <li>Wait for the model to download (~3GB)</li>
         </ol>
 
-        <h4>Option B: Excel Desktop</h4>
-        <ol>
-            <li>Open Microsoft Excel on your computer</li>
-            <li>Go to Insert → My Add-ins</li>
-            <li>Load the Cellami add-in</li>
-            <li>The Cellami panel will appear on the right side</li>
-        </ol>
+        <h3>Step 4: Launch & Sync</h3>
+        <p>Ensure both Ollama and the Cellami Desktop app are running, then interact with the task pane in Excel.</p>
     </div>
 
     <div class="page-break"></div>

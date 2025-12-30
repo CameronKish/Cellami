@@ -646,6 +646,15 @@ const App = () => {
         </div>
       </main>
 
+      <footer className="fixed bottom-0 left-0 right-0 py-2 px-12 bg-white/30 backdrop-blur-sm border-t border-white/20 flex justify-between items-center text-[10px] text-slate-400 z-[1000]">
+        <p>&copy; {new Date().getFullYear()} Cellami. AI analysis, built privacy first.</p>
+        <div className="flex gap-4">
+          <a href="/privacy.html" target="_blank" rel="noopener noreferrer" className="hover:text-sky-600 transition-colors">Privacy</a>
+          <a href="/terms.html" target="_blank" rel="noopener noreferrer" className="hover:text-sky-600 transition-colors">Terms</a>
+          <a href="/support.html" target="_blank" rel="noopener noreferrer" className="hover:text-sky-600 transition-colors">Support</a>
+        </div>
+      </footer>
+
       <MarkdownViewer
         isOpen={viewerOpen}
         onClose={() => setViewerOpen(false)}

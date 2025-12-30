@@ -53,7 +53,7 @@ Every AI response includes transparency. See exactly which document passages wer
 • Supports multiple models (Llama, Mistral, Gemma, and more)
 
 **🛠 How It Works**
-Cellami uses a lightweight companion app that runs in your system tray. The app connects to Ollama (a free, open-source AI runtime) to power the AI capabilities. Simply install both, and the Excel add-in handles the rest.
+Cellami requires two local components to provide private AI processing. (1) **Ollama** runs the AI models on your hardware, and (2) the **Cellami Desktop App** securely connects those models to Excel. Simply install both, add the Excell add-in, and you're ready to go.
 
 **👥 Perfect For**
 • Financial analysts who can't share sensitive data
@@ -67,7 +67,7 @@ Cellami uses a lightweight companion app that runs in your system tray. The app 
 • Ollama (free download from ollama.com)
 • 8GB RAM minimum (16GB recommended)
 
-Get started in minutes. No account required. No credit card. Just install and go.
+Get started in minutes: Add from Store, download the companion app and Ollama, and launch.
 ```
 
 ---
@@ -190,13 +190,13 @@ All markets (or select based on your preference)
 ```
 TESTING REQUIREMENTS
 ====================
-This add-in requires a companion desktop application to function.
+This add-in requires two local components to function.
 
-1. Download Cellami desktop app from: https://github.com/CameronKish/Cellami/releases
-2. Download Ollama from: https://ollama.com
-3. Run: ollama pull gemma3:4b
-4. Launch Cellami desktop app (runs in system tray/menu bar)
-5. Test the add-in in Excel Online (excel.office.com) for easiest setup
+1. Get the Add-in in Excel (Search 'Cellami' or use manifest)
+2. Download Cellami desktop app from: https://github.com/CameronKish/Cellami/releases
+3. Download Ollama from: https://ollama.com
+4. Run: ollama pull gemma3:4b
+5. Ensure both apps are running and test in Excel Online (excel.office.com)
 
 NO ACCOUNTS OR LICENSE KEYS REQUIRED
 All processing happens locally on the test machine.

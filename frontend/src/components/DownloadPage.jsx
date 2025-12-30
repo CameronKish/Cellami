@@ -125,13 +125,14 @@ const DownloadPage = () => {
                     </h2>
 
                     <div className="relative">
-                        {/* Connecting Line - Manually Centered (Circle height 56px, so top-7 is 28px) */}
-                        <div className="absolute top-7 left-[15%] right-[15%] h-0.5 bg-slate-200 hidden md:block opacity-60"></div>
+                        {/* Connecting Line - Manually Centered */}
+                        <div className="absolute top-7 left-[10%] right-[10%] h-0.5 bg-slate-200 hidden md:block opacity-60"></div>
 
-                        <div className="grid md:grid-cols-3 gap-16 relative z-10 w-full place-items-center">
-                            <Step number="1" title="Download Cellami" desc="Get the local AI app for MacOS or Windows from GitHub." />
-                            <Step number="2" title="Add from Store" desc="Search for 'Cellami' in the Microsoft Excel Store and click Add." />
-                            <Step number="3" title="Launch & Sync" desc="Open the Cellami app, then open the task pane in Excel." />
+                        <div className="grid md:grid-cols-4 gap-8 relative z-10 w-full place-items-center">
+                            <Step number="1" title="Get the Add-in" desc="Search 'Cellami' in the Microsoft Excel Store and click Add." />
+                            <Step number="2" title="Download Cellami" desc="Get the companion desktop app for MacOS or Windows from GitHub." />
+                            <Step number="3" title="Install Ollama" desc="Install the free AI engine from ollama.com to power your models." />
+                            <Step number="4" title="Launch & Sync" desc="Run both apps, then open the Cellami task pane in Excel." />
                         </div>
                     </div>
                 </div>
@@ -145,7 +146,7 @@ const DownloadPage = () => {
                 <div className="max-w-2xl w-full text-center">
                     <h2 className="text-4xl font-bold mb-16 text-slate-900 tracking-tight">FAQ</h2>
                     <div className="divide-y divide-slate-200 w-full">
-                        <AccordionItem q="Why do I need to download an 'App'?" a="Because Cellami runs LLMs locally on your hardware for 100% privacy, the desktop app handles the heavy processing that regular web-based add-ins can't." />
+                        <AccordionItem q="Why do I need to download two separate apps?" a="To provide 100% private AI, Cellami requires two local components: (1) Ollama, which acts as the 'brain' running the AI models on your hardware, and (2) the Cellami Desktop App, which securely bridges those models to Excel. This ensures your data never touches the cloud." />
                         <AccordionItem q="Will this slow down my Excel?" a="No. Cellami runs as a separate background process, ensuring Excel remains lightweight and responsive." />
                         <AccordionItem q="Do I need a GPU?" a="It helps, but we support optimized models for modern CPUs (M1/M2/M3 or recent Intel/AMD) that run impressively fast." />
                         <AccordionItem q="Is it really free?" a="The engine is free and open source. You host the data and the models yourself." />
@@ -153,8 +154,15 @@ const DownloadPage = () => {
                 </div>
             </section>
 
-            <footer className="py-12 text-center text-slate-400 text-sm bg-slate-50 border-t border-slate-200">
-                <p>&copy; {new Date().getFullYear()} Cellami AI. Built for privacy.</p>
+            <footer className="py-12 bg-slate-50 border-t border-slate-200">
+                <div className="max-w-7xl mx-auto px-12 flex flex-col md:flex-row justify-between items-center gap-4 text-slate-400 text-sm">
+                    <p>&copy; {new Date().getFullYear()} Cellami. AI analysis, built privacy first.</p>
+                    <div className="flex gap-6">
+                        <a href="/privacy.html" target="_blank" rel="noopener noreferrer" className="hover:text-sky-600 transition-colors">Privacy</a>
+                        <a href="/terms.html" target="_blank" rel="noopener noreferrer" className="hover:text-sky-600 transition-colors">Terms</a>
+                        <a href="/support.html" target="_blank" rel="noopener noreferrer" className="hover:text-sky-600 transition-colors">Support</a>
+                    </div>
+                </div>
             </footer>
         </div>
     );
