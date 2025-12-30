@@ -755,7 +755,8 @@ async def chat(request: ChatRequest):
                 # We use the sync function here as per existing patterns, though async would be better long-term
                 generated_query = await get_ollama_generate(query_gen_prompt, model, temperature=0.3)
                 generated_query = generated_query.strip().strip('"').strip("'")
-                logger.info(f"RAG Query Expansion: (length: {len(last_user_msg['content'])}) -> '{generated_query}'")
+                # [SOC2] Redacted sensitive query
+                logger.info(f"RAG Query Expansion: (length: {len(last_user_msg['content'])}) -> [REDACTED QUERY]")
                 
                 # 3. Execute Search with Generated Query
                 # Run RAG search in thread to avoid blocking the event loop (embedding generation is heavy)
@@ -1279,9 +1280,9 @@ async def process_document_task(task_id: str, temp_path: str, filename: str):
                     failed_chunks += 1
                     failed_indices.append(i)
             except Exception as e:
-                print(f"Task {task_id}: Error embedding chunk {i+1}: {e}")
-                # Log problematic chunk content (truncated)
-                print(f"Task {task_id}: Failed chunk content: {chunk[:100]}...")
+                logger.error(f"Task {task_id}: Error embedding chunk {i+1}: {e}")
+                # Log problematic chunk content (redacted)
+                logger.error(f"Task {task_id}: Failed chunk content: [REDACTED]")
                 failed_chunks += 1
                 failed_indices.append(i)
 
