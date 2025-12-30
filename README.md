@@ -10,138 +10,77 @@
 
 ### 1. Knowledge Base
 Upload your own documents (PDFs, Word, etc.) and ask questions based on them. Cellami uses your local files to provide accurate, context-aware answers.
-![Knowledge Base Demo](assets/Screenshots/Cellami%20-%20Docs%20SC.png)
+![Knowledge Base Demo](assets/screenshots/docs-hd.png)
 
 ### 2. Query Cells
 Select any cell in your spreadsheet and ask Cellami to process it. Perfect for quick analysis, summarization, or extraction tasks on specific data points. Activate the knowledge base for context-aware answers.
-![Cell Query Demo](assets/Screenshots/Cellami%20-%20Cell%20Query%20SC.png)
+![Cell Query Demo](assets/screenshots/cell-hd.png)
 
 ### 3. Query Tables
 Analyze entire tables at once. Select a range of data, and Cellami will analyze the full table or individual entries sequentially to provide comprehensive insights. Activate the knowledge base for context-aware answers.
-![Table Query Demo](assets/Screenshots/Cellami%20-%20Table%20Query%20SC.png)
+![Table Query Demo](assets/screenshots/table-hd.png)
 
 ### 4. Audit Answers
 Trace back every answer to its source. The Audit tab shows you exactly which document chunks were used to generate a response, ensuring transparency and trust.
-![Audit Tab Demo](assets/Screenshots/Cellami%20-%20Audit%20SC.png)
+![Audit Tab Demo](assets/screenshots/audit-hd.png)
 
 ### 5. Chat with Tables
 Have a free-form conversation with your data. The Chat tab allows for open-ended questions and follow-ups, maintaining context throughout your session.
-![Chat Tab Demo](assets/Screenshots/Cellami%20-%20Chat%20SC.png)
+![Chat Tab Demo](assets/screenshots/chat-hd.png)
 
 
 ---
 
-## 📦 App Download & Installation
+## 📦 Installation & Setup
 
-### 1. Install the App (Mac Only)
-1.  Download the **`Cellami_Mac.zip`** file from the **Releases** section on GitHub.
-2.  Unzip the file. You will find **`Cellami.app`** and **`manifest.prod.xml`**.
-3.  Move **`Cellami.app`** to your Applications folder.
-4.  Double-click **`Cellami.app`** to start it. (wait ~15 seconds for it to appear)
-    *   **Note:** You won't see a window pop up! Look for the **Cellami icon** in your Mac's top menu bar (System Tray).
+Cellami runs entirely on your local machine. Follow these three steps to get started.
 
-### 2. Connect Excel
+### 1. Install Ollama (Prerequisite)
+Cellami uses **Ollama** to run AI models locally.
+1. Download and install it from [ollama.com](https://ollama.com).
+2. After installation, open your Terminal/PowerShell and download a model (we recommend `ministral-3:8b`):
+   ```bash
+   ollama pull ministral-3:8b
+   ```
 
-#### 🍎 macOS
-1.  Open **Microsoft Excel**.
-2.  You need to "sideload" the add-in manifest once:
-    *   Go to this folder on your Mac:
-        `~/Library/Containers/com.microsoft.Excel/Data/Documents/wef` (if the "wef" folder doesn't exist, you will need to create it)
-        *(Press `Cmd+Shift+G` in Finder and paste that path)*.
-    *   Copy the **`manifest.prod.xml`** file (from the unzipped folder) into that folder.
-3.  Restart Excel.
-4.  Go to the **Insert** tab > and click the drop down arrow next to **My Add-ins**. 
-5.  Select **Cellami** from the Developer add-ins section.
+### 2. Run the Cellami Desktop App
+Download the latest release for your system and launch the app.
+*   **Mac:** Drag `Cellami.app` to your Applications folder and open it.
+*   **Windows:** Unzip the folder and run `Cellami.exe`.
+*   *Note: On both systems, look for the **Cellami icon** in your menu bar / system tray. The app runs in the background.*
 
-#### 🌐 Windows / Mac (Testing via Excel Online) - **EASIEST**
-1.  **Run the Cellami App** (ensure the backend is running).
-    *   **Windows Users:** You **MUST** Unzip/Extract the file first. Do not run `Cellami.exe` from inside the zip. Right-click > "Extract All".
-2.  Open [Excel Online](https://excel.office.com/) in Edge or Chrome.
-3.  Create a Blank Workbook.
-4.  Go to **Insert** > **Add-ins**.
-5.  Select **Upload My Add-in** (often under "Manage My Add-ins" > "Upload My Add-in").
-6.  Upload **`store_package/manifest.prod.xml`**.
-    *   *Note: This verifies the Production setup (Vercel Frontend + Local Backend).*
-
-#### 🪟 Windows (Desktop - Shared Folder Method)
-1.  Create a folder on your computer (e.g., `C:\Manifests`) and put `manifest.prod.xml` inside it.
-2.  **Share the folder:**
-    *   Right-click the folder > **Properties** > **Sharing** > **Share...**
-    *   Add yourself (or "Everyone") and click **Share**.
-    *   Note the "Network Path" (e.g., `\\Your-PC\Manifests`).
-3.  **Trust the folder in Excel:**
-    *   Open Excel > **File** > **Options**.
-    *   Go to **Trust Center** > **Trust Center Settings...**
-    *   Select **Trusted Add-in Catalogs**.
-    *   In "Catalog Url", paste the **Network Path** you copied.
-    *   Click **Add Catalog**.
-    *   Check the box **"Show in Menu"**.
-    *   Click **OK** twice to restart Excel.
-4.  **Load the Add-in:**
-    *   **Close the Options window** to return to your spreadsheet.
-    *   Go to the **Insert** tab (at the top of the screen, next to Home).
-    *   Click **My Add-ins** (or "Add-ins" > "My Add-ins").
-    *   Click **SHARED FOLDER** at the top of the popup window.
-    *   Select **Cellami** and click **Add**.
+### 3. Add Cellami to Excel
+Once the app is running, you can add Cellami to Excel in two ways:
+*   **Microsoft Store:** Search for "Cellami" in the Excel Add-ins store and click **Add**.
+*   **Sideload:** Go to **Insert** > **Add-ins** > **Upload My Add-in** and select the `manifest.prod.xml` file located in the `store_package` folder of this repository.
 
 ---
 
-## 💻 Development (For Contributors)
+
+## 🏗️ Development (For Contributors)
 
 ### Prerequisites
 *   **Node.js** (for Frontend)
 *   **Python 3.12+** (for Backend)
 
-### Setup
-1.  **Frontend:**
-    ```bash
-    cd frontend
-    npm install
-    ```
-2.  **Backend:**
-    ```bash
-    pip install -r requirements.txt
-    ```
-
-### Running Locally
-1.  **Start Frontend:**
-    ```bash
-    cd frontend
-    npm run dev
-    ```
-2.  **Start Backend:**
-    ```bash
-    python main.py
-    ```
+### Setup & Running
+1.  **Backend:** `pip install -r requirements.txt && python main.py`
+2.  **Frontend:** `cd frontend && npm install && npm run dev`
 
 ---
 
 ## 🏗️ Building (Distribution)
 
-To create the standalone application:
-
-### 1. Install Dependencies
-Run this in your terminal (same for Mac/Windows):
+To create a standalone installer for your platform:
 
 ```bash
-# Frontend
-cd frontend
-npm install
-cd ..
-
-# Backend
+# 1. Install dependencies
 pip install -r requirements.txt
+cd frontend && npm install && cd ..
+
+# 2. Run the build script
+./scripts/build_app.sh  # macOS
+.\scripts\build_app.bat # Windows
 ```
+*Installer packages will be generated in the `dist/` directory.*
 
-### 2. Run Build Script
-*   **🍎 macOS (zsh):**
-    ```zsh
-    ./scripts/build_app.sh
-    ```
-    *Creates `dist/Cellami.app`*
-
-*   **🪟 Windows (PowerShell):**
-    ```powershell
-    .\scripts\build_app.bat
-    ```
-    *Creates `dist/Cellami.exe`*
