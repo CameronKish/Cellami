@@ -50,9 +50,13 @@ Download the latest release for your system and launch the app.
 *   *Note: On both systems, look for the **Cellami icon** in your menu bar / system tray. The app runs in the background.*
 
 ### 3. Add Cellami to Excel
-Once the app is running, you can add Cellami to Excel in two ways:
-*   **Microsoft Store:** Search for "Cellami" in the Excel Add-ins store and click **Add**.
-*   **Sideload:** Go to **Insert** > **Add-ins** > **Upload My Add-in** and select the `manifest.prod.xml` file located in the `store_package` folder of this repository.
+Once the app is running, you need to add the manifest file to Excel. This tells Excel where to find the local Cellami server.
+
+**The manifest file is named `manifest.prod.xml` and is located in the `store_package` folder of this repository.**
+
+There are two ways to add it:
+*   **Excel on the Web (Easiest):** Go to **Insert** > **Add-ins** > **Upload My Add-in** and select the `manifest.prod.xml` file.
+*   **Excel Verification (Sideloading):** If you are on desktop, you may need to sideload the manifest. Follow Microsoft's guide on [sideloading add-ins](https://learn.microsoft.com/en-us/office/dev/add-ins/testing/test-debug-office-add-ins#sideload-an-office-add-in-for-testing). Provide `manifest.prod.xml` when prompted.
 
 ---
 

@@ -140,7 +140,7 @@ const DownloadPage = () => {
                         <div className="absolute top-7 left-[12.5%] right-[12.5%] h-0.5 bg-slate-200 hidden md:block opacity-60"></div>
 
                         <div className="grid md:grid-cols-4 gap-4 relative z-10 w-full">
-                            <Step number="1" title="Get the Add-in" desc="Search 'Cellami' in the Microsoft Excel Store and click Add." />
+                            <Step number="1" title="Get the Add-in" desc="Add the manifest via Excel in the browser or sideload on desktop." />
                             <Step number="2" title="Download Cellami" desc="Get the companion desktop app for MacOS or Windows from GitHub." />
                             <Step number="3" title="Install Ollama" desc="Install the free AI engine from ollama.com to power your models." />
                             <Step number="4" title="Launch & Sync" desc="Run both apps, then open the Cellami task pane in Excel." />
